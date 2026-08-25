@@ -2,14 +2,22 @@
 // Mapa central de assets visuales por rol. Si la imagen no carga (404), se usa el
 // emoji y color de fallback definidos aqui, para que la interfaz nunca se rompa.
 //
-// Las imagenes siguen el patron de nombre: card_<roleIdSinGuionBajo>.webp
+// Regla general de nombre de archivo: card_<roleIdSinGuionBajo>.webp
 // Ejemplos: werewolf -> card_werewolf.webp, alpha_wolf -> card_alphawolf.webp,
 // wolf_shaman -> card_wolfshaman.webp, town_crier -> card_towncrier.webp
 //
-// Coloca los archivos en client/images/roles/ con esos nombres exactos.
+// Excepciones (algunos roles usan un nombre distinto al patron automatico,
+// segun como vinieron nombrados los archivos reales):
+//   courtesan -> card_harlot.webp
+//   lover     -> card_lovers.webp
 
 const IMAGE_EXTENSION = "webp";
 const IMAGE_BASE_PATH = "images/roles";
+
+const ROLE_IMAGE_OVERRIDES = {
+  courtesan: "card_harlot.webp",
+  lover: "card_lovers.webp",
+};
 
 const ROLE_ASSETS = {
   villager:     { emoji: "🧑‍🌾", color: "#3a5a40" },
@@ -42,6 +50,7 @@ const ROLE_ASSETS = {
 };
 
 function getRoleImageFileName(roleId) {
+  if (ROLE_IMAGE_OVERRIDES[roleId]) return ROLE_IMAGE_OVERRIDES[roleId];
   const compact = roleId.replace(/_/g, "");
   return `card_${compact}.${IMAGE_EXTENSION}`;
 }
