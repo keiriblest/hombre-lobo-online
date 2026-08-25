@@ -55,6 +55,8 @@ class Room {
     this.phaseTimer = null;
     this.lovePairs = [];
     this.usedOnceAbilities = new Set();
+    this.usedShields = new Set();
+    this.jesterEliminated = false;
     this.botCounter = 0;
   }
 
@@ -149,11 +151,19 @@ class Room {
     return this.alivePlayers().filter((p) => p.role.team === "good");
   }
 
+  isKingImmuneAtNight() {
+    const king = this.alivePlayers().find((p) => p.role.id === "king");
+    if (!king) return false;
+    return king.role.isImmuneAtNight ? king.role.isImmuneAtNight(this) : false;
+  }
+
   checkWinCondition() {
+    if (this.jesterEliminated) return "jester";
+
     const wolves = this.wolvesAlive().length;
-    const good = this.goodAlive().length;
+    const goodExcludingJester = this.goodAlive().filter((p) => p.role.id !== "jester").length;
     if (wolves === 0) return "good";
-    if (wolves >= good) return "evil";
+    if (wolves >= goodExcludingJester) return "evil";
     return null;
   }
 
@@ -171,6 +181,16 @@ class Room {
     if (!player || !player.alive) return;
     player.alive = false;
     this.deadPlayers[playerId] = player;
+    if (player.role.id === "jester") this.jesterEliminated = true;
+  }
+
+  revivePlayer(playerId) {
+    const player = this.deadPlayers[playerId];
+    if (!player) return null;
+    player.alive = true;
+    delete this.deadPlayers[playerId];
+    if (player.role.id === "jester") this.jesterEliminated = false;
+    return player;
   }
 }
 

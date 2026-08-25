@@ -7,7 +7,7 @@ module.exports = {
   hasNightAction: false,
 
   isImmuneAtNight(game) {
-    return game.alivePlayers().some((p) => ["knight", "princess", "jester"].includes(p.role.id));
+    return game.alivePlayers().some((p) => ["knight", "princess", "jester"].includes(p.role.id) && p.alive);
   },
 
   onLynch(game, playerId) {

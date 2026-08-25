@@ -8,7 +8,9 @@ module.exports = {
   nightOrder: 25,
 
   resolveNightAction(game, actingPlayerId, targetPlayerId) {
+    const target = game.players[targetPlayerId];
+    if (!target) return null;
     game.nightState.townCrierWatchId = targetPlayerId;
-    return { type: "town_crier_confirm", targetId: targetPlayerId };
+    return { type: "town_crier_confirm", targetId: targetPlayerId, targetName: target.name };
   },
 };

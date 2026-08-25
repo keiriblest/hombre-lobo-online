@@ -12,6 +12,6 @@ module.exports = {
     const target = game.deadPlayers ? game.deadPlayers[targetPlayerId] : null;
     if (!target || target.role.team !== "good") return null;
     game.nightState.revivedPlayerId = targetPlayerId;
-    return { type: "necromancer_revive", targetId: targetPlayerId };
+    return { type: "necromancer_revive", targetId: targetPlayerId, targetName: target.name };
   },
 };

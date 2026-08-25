@@ -10,12 +10,29 @@ let state = {
   isHost: false,
   myRole: null,
   currentPlayers: [],
+  voteTally: {},
 };
 
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
 }
+
+let popupTimeout = null;
+
+socket.on("show_popup", ({ text, type }) => {
+  const overlay = document.getElementById("popup-overlay");
+  const box = document.getElementById("popup-box");
+  document.getElementById("popup-text").textContent = text;
+
+  box.className = "popup-box popup-" + (type || "info");
+  overlay.classList.remove("hidden");
+
+  clearTimeout(popupTimeout);
+  popupTimeout = setTimeout(() => {
+    overlay.classList.add("hidden");
+  }, 3000);
+});
 
 function loadProfile() {
   try {
@@ -216,7 +233,10 @@ socket.on("phase_change", ({ phase, dayNumber, durationMs }) => {
     document.getElementById("night-targets").innerHTML = "";
     document.getElementById("night-wait-msg").classList.add("hidden");
   }
-  if (phase === "voting") renderVotingTargets();
+  if (phase === "voting") {
+    state.voteTally = {};
+    renderVotingTargets();
+  }
   if (phase === "day") renderDayActionTargets();
 
   startPhaseTimer(durationMs);
@@ -271,11 +291,22 @@ function renderVotingTargets() {
   const container = document.getElementById("voting-targets");
   container.innerHTML = "";
   (state.currentPlayers || [])
-    .filter((p) => p.alive)
+    .filter((p) => p.alive && p.id !== socket.id)
     .forEach((p) => {
       const btn = document.createElement("div");
-      btn.className = "target-btn";
-      btn.textContent = p.name;
+      btn.className = "target-btn vote-target";
+      btn.dataset.playerId = p.id;
+
+      const countBadge = document.createElement("span");
+      countBadge.className = "vote-count-badge";
+      countBadge.textContent = state.voteTally[p.id] || 0;
+
+      const label = document.createElement("span");
+      label.textContent = p.name;
+
+      btn.appendChild(label);
+      btn.appendChild(countBadge);
+
       btn.addEventListener("click", () => {
         container.querySelectorAll(".target-btn").forEach((b) => b.classList.remove("selected"));
         btn.classList.add("selected");
@@ -284,6 +315,15 @@ function renderVotingTargets() {
       container.appendChild(btn);
     });
 }
+
+socket.on("vote_tally", ({ tally }) => {
+  state.voteTally = tally || {};
+  document.querySelectorAll(".vote-target").forEach((btn) => {
+    const pid = btn.dataset.playerId;
+    const badge = btn.querySelector(".vote-count-badge");
+    if (badge) badge.textContent = state.voteTally[pid] || 0;
+  });
+});
 
 function renderDayActionTargets() {
   if (!state.myRole || !state.myRole.hasDayActionOnce) return;
@@ -363,8 +403,8 @@ socket.on("wolf_chat_message", (msg) => {
 
 socket.on("game_over", ({ winner, roles }) => {
   clearInterval(phaseInterval);
-  document.getElementById("end-title").textContent =
-    winner === "good" ? "🎉 El pueblo ha ganado" : "🐺 Los lobos han ganado";
+  const titles = { good: "🎉 El pueblo ha ganado", evil: "🐺 Los lobos han ganado", jester: "🏏 El Jester ha ganado" };
+  document.getElementById("end-title").textContent = titles[winner] || "Partida terminada";
 
   const ul = document.getElementById("end-roles");
   ul.innerHTML = "";

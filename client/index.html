@@ -8,6 +8,12 @@
 </head>
 <body>
 
+<div id="popup-overlay" class="popup-overlay hidden">
+  <div id="popup-box" class="popup-box">
+    <span id="popup-text"></span>
+  </div>
+</div>
+
 <div id="screen-lobby" class="screen active">
   <div class="card">
     <h1>🐺 Hombre Lobo Online</h1>
@@ -42,7 +48,7 @@
     </div>
 
     <button id="btn-start" class="hidden">Iniciar partida (min. 4 jugadores)</button>
-    <p id="room-hint" class="hint">Comparte el codigo de sala con tus amigos.</p>
+    <p id="room-hint" class="hint">Comparte el codigo de sala con tus amigos. La primera votacion empieza de inmediato al iniciar.</p>
   </div>
 </div>
 
@@ -85,6 +91,7 @@
 
     <div id="voting-panel" class="panel hidden">
       <h3>Votacion: ¿quien es sospechoso?</h3>
+      <p class="hint">No puedes votar por ti mismo. El numero en cada jugador es la cantidad de votos que tiene ahora.</p>
       <div id="voting-targets" class="target-list"></div>
     </div>
 
