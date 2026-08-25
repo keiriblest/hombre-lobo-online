@@ -64,6 +64,36 @@ button.secondary { background: #0f3460; }
 .error { color: #ff6b6b; min-height: 20px; }
 .hint { color: #9a9a9a; font-size: 13px; }
 
+.avatar-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #1a1a2e;
+  border: 2px solid #0f3460;
+  display: none;
+}
+.avatar-preview.visible { display: block; }
+
+.avatar-label {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #0f3460;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: center;
+}
+.avatar-label:hover { opacity: 0.85; }
+
 .player-list {
   list-style: none;
   padding: 0;
@@ -78,8 +108,42 @@ button.secondary { background: #0f3460; }
   border-radius: 8px;
   display: flex;
   justify-content: space-between;
+  align-items: center;
 }
 .player-list li.dead { opacity: 0.4; text-decoration: line-through; }
+
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.player-avatar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f3460;
+  font-size: 14px;
+}
+
+.remove-bot-btn {
+  width: auto;
+  padding: 4px 10px;
+  margin: 0;
+  font-size: 12px;
+  background: #444;
+}
+
+#bot-controls {
+  margin: 12px 0;
+}
 
 .role-badge {
   font-size: 22px;

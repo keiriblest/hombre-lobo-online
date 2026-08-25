@@ -1,9 +1,12 @@
 // client/js/main.js
 const socket = io();
 
+const STORAGE_KEY = "hombreLoboProfile";
+
 let state = {
   code: null,
   playerName: null,
+  avatar: null,
   isHost: false,
   myRole: null,
   currentPlayers: [],
@@ -14,12 +17,78 @@ function showScreen(id) {
   document.getElementById(id).classList.add("active");
 }
 
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const profile = JSON.parse(raw);
+    if (profile.name) document.getElementById("input-name").value = profile.name;
+    if (profile.avatar) {
+      state.avatar = profile.avatar;
+      document.getElementById("avatar-preview").src = profile.avatar;
+      document.getElementById("avatar-preview").classList.add("visible");
+    }
+  } catch (e) {
+    console.warn("No se pudo cargar el perfil guardado", e);
+  }
+}
+
+function saveProfile(name, avatar) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, avatar: avatar || null }));
+  } catch (e) {
+    console.warn("No se pudo guardar el perfil (localStorage lleno o bloqueado)", e);
+  }
+}
+
+document.getElementById("avatar-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (file.size > 1.5 * 1024 * 1024) {
+    showLobbyError("La imagen es muy grande. Usa una foto de menos de 1.5 MB.");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    resizeImage(reader.result, 128, (resizedDataUrl) => {
+      state.avatar = resizedDataUrl;
+      document.getElementById("avatar-preview").src = resizedDataUrl;
+      document.getElementById("avatar-preview").classList.add("visible");
+      showLobbyError("");
+    });
+  };
+  reader.readAsDataURL(file);
+});
+
+function resizeImage(dataUrl, maxSize, callback) {
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    let { width, height } = img;
+    if (width > height) {
+      if (width > maxSize) { height *= maxSize / width; width = maxSize; }
+    } else {
+      if (height > maxSize) { width *= maxSize / height; height = maxSize; }
+    }
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+    callback(canvas.toDataURL("image/jpeg", 0.8));
+  };
+  img.src = dataUrl;
+}
+
+loadProfile();
+
 document.getElementById("btn-create").addEventListener("click", () => {
   const name = document.getElementById("input-name").value.trim();
   if (!name) return showLobbyError("Escribe tu nombre.");
   state.playerName = name;
+  saveProfile(name, state.avatar);
 
-  socket.emit("create_room", { playerName: name }, (res) => {
+  socket.emit("create_room", { playerName: name, avatar: state.avatar }, (res) => {
     if (!res.ok) return showLobbyError(res.error || "Error al crear la sala.");
     state.code = res.code;
     state.isHost = true;
@@ -33,8 +102,9 @@ document.getElementById("btn-join").addEventListener("click", () => {
   if (!name) return showLobbyError("Escribe tu nombre.");
   if (!code) return showLobbyError("Escribe el codigo de sala.");
   state.playerName = name;
+  saveProfile(name, state.avatar);
 
-  socket.emit("join_room", { code, playerName: name }, (res) => {
+  socket.emit("join_room", { code, playerName: name, avatar: state.avatar }, (res) => {
     if (!res.ok) return showLobbyError(res.error || "Error al unirse.");
     state.code = res.code;
     state.isHost = false;
@@ -49,6 +119,7 @@ function showLobbyError(msg) {
 function enterRoomScreen() {
   document.getElementById("room-code-label").textContent = state.code;
   document.getElementById("btn-start").classList.toggle("hidden", !state.isHost);
+  document.getElementById("bot-controls").classList.toggle("hidden", !state.isHost);
   showScreen("screen-room");
 }
 
@@ -56,9 +127,13 @@ document.getElementById("btn-start").addEventListener("click", () => {
   socket.emit("start_game", { code: state.code });
 });
 
+document.getElementById("btn-add-bot").addEventListener("click", () => {
+  socket.emit("add_bot", { code: state.code });
+});
+
 socket.on("player_list", (players) => {
-  renderPlayerList(document.getElementById("player-list"), players);
-  renderPlayerList(document.getElementById("game-player-list"), players);
+  renderPlayerList(document.getElementById("player-list"), players, true);
+  renderPlayerList(document.getElementById("game-player-list"), players, false);
   state.currentPlayers = players;
 
   const startBtn = document.getElementById("btn-start");
@@ -70,12 +145,36 @@ socket.on("player_list", (players) => {
   }
 });
 
-function renderPlayerList(ul, players) {
+function renderPlayerList(ul, players, showRemoveBot) {
   ul.innerHTML = "";
   players.forEach((p) => {
     const li = document.createElement("li");
     if (!p.alive) li.classList.add("dead");
-    li.innerHTML = `<span>${p.name}${p.id === socket.id ? " (tu)" : ""}</span><span>${p.alive ? "🟢" : "💀"}</span>`;
+
+    const left = document.createElement("span");
+    left.className = "player-row";
+    const avatarHtml = p.avatar
+      ? `<img src="${p.avatar}" class="player-avatar" />`
+      : `<span class="player-avatar player-avatar-placeholder">${p.isBot ? "🤖" : "👤"}</span>`;
+    left.innerHTML = `${avatarHtml}<span>${p.name}${p.id === socket.id ? " (tu)" : ""}${p.isBot ? " (bot)" : ""}</span>`;
+
+    const right = document.createElement("span");
+    right.textContent = p.alive ? "🟢" : "💀";
+
+    li.appendChild(left);
+
+    if (showRemoveBot && p.isBot && state.isHost) {
+      const removeBtn = document.createElement("button");
+      removeBtn.textContent = "Quitar";
+      removeBtn.className = "remove-bot-btn";
+      removeBtn.addEventListener("click", () => {
+        socket.emit("remove_bot", { code: state.code, botId: p.id });
+      });
+      li.appendChild(removeBtn);
+    } else {
+      li.appendChild(right);
+    }
+
     ul.appendChild(li);
   });
 }

@@ -35,6 +35,11 @@ function shuffle(arr) {
   return arr;
 }
 
+const BOT_NAMES = [
+  "Bot Ana", "Bot Luis", "Bot Marta", "Bot Diego", "Bot Sara",
+  "Bot Pablo", "Bot Elena", "Bot Hugo", "Bot Nora", "Bot Iker",
+];
+
 class Room {
   constructor(code, hostSocketId) {
     this.code = code;
@@ -50,16 +55,35 @@ class Room {
     this.phaseTimer = null;
     this.lovePairs = [];
     this.usedOnceAbilities = new Set();
+    this.botCounter = 0;
   }
 
-  addPlayer(socketId, name) {
+  addPlayer(socketId, name, avatar) {
     this.players[socketId] = {
       id: socketId,
       name,
+      avatar: avatar || null,
       role: null,
       alive: true,
       socketId,
+      isBot: false,
     };
+  }
+
+  addBot() {
+    this.botCounter += 1;
+    const botId = `bot_${this.code}_${this.botCounter}_${Date.now()}`;
+    const name = BOT_NAMES[(this.botCounter - 1) % BOT_NAMES.length] + (this.botCounter > BOT_NAMES.length ? ` ${this.botCounter}` : "");
+    this.players[botId] = {
+      id: botId,
+      name,
+      avatar: null,
+      role: null,
+      alive: true,
+      socketId: null,
+      isBot: true,
+    };
+    return this.players[botId];
   }
 
   removePlayer(socketId) {
@@ -72,6 +96,10 @@ class Room {
 
   alivePlayers() {
     return this.playerList().filter((p) => p.alive);
+  }
+
+  botsAlive() {
+    return this.alivePlayers().filter((p) => p.isBot);
   }
 
   assignRoles() {

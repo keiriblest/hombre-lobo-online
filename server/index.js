@@ -7,7 +7,7 @@ const { Room } = require("./gameState");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, { cors: { origin: "*" }, maxHttpBufferSize: 2e6 });
 
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "..", "client")));
@@ -17,6 +17,7 @@ const rooms = {};
 const NIGHT_DURATION_MS = 45 * 1000;
 const DAY_DURATION_MS = 90 * 1000;
 const VOTING_DURATION_MS = 30 * 1000;
+const MAX_PLAYERS = 20;
 
 function generateRoomCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -28,7 +29,7 @@ function generateRoomCode() {
 }
 
 function publicPlayerList(room) {
-  return room.playerList().map((p) => ({ id: p.id, name: p.name, alive: p.alive }));
+  return room.playerList().map((p) => ({ id: p.id, name: p.name, alive: p.alive, avatar: p.avatar, isBot: p.isBot }));
 }
 
 function broadcastPlayerList(room) {
@@ -43,7 +44,54 @@ function sendSystemMessage(room, text) {
 
 function sendWolfChatMessage(room, author, text) {
   const msg = { author, text, ts: Date.now() };
-  room.wolvesAlive().forEach((w) => io.to(w.socketId).emit("wolf_chat_message", msg));
+  room.wolvesAlive().forEach((w) => {
+    if (w.socketId) io.to(w.socketId).emit("wolf_chat_message", msg);
+  });
+}
+
+function botChooseNightTarget(room, bot) {
+  const role = bot.role;
+  let candidates = room.alivePlayers().filter((p) => p.id !== bot.id || ["doctor", "druid"].includes(role.id));
+
+  if (role.id === "necromancer") {
+    candidates = Object.values(room.deadPlayers).filter((p) => p.role.team === "good");
+  } else if (role.team === "evil" && (role.id === "werewolf" || role.id === "alpha_wolf")) {
+    candidates = room.alivePlayers().filter((p) => p.role.team === "good");
+  }
+
+  if (candidates.length === 0) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)].id;
+}
+
+function runBotNightActions(room) {
+  room.botsAlive().forEach((bot) => {
+    const role = bot.role;
+    const alreadyUsedOnce = role.hasNightActionOnce && room.usedOnceAbilities.has(bot.id);
+    if ((role.hasNightAction || role.hasNightActionOnce) && !alreadyUsedOnce) {
+      if (room.nightState.disabledPlayerIds.has(bot.id)) return;
+      const targetId = botChooseNightTarget(room, bot);
+      if (!targetId || !role.resolveNightAction) return;
+
+      const result = role.resolveNightAction(room, bot.id, targetId);
+      if (!result) return;
+      if (role.hasNightActionOnce) room.usedOnceAbilities.add(bot.id);
+
+      if (role.id === "seer") room.nightState.seerResults[bot.id] = result;
+      if (role.id === "mystic") room.nightState.mysticResults[bot.id] = result;
+      if (role.id === "bard") room.nightState.bardResults[bot.id] = result;
+      if (role.id === "town_crier") room.nightState.townCrierWatchId = targetId;
+      if (role.id === "assassin") room.nightState.assassinTargetId = targetId;
+    }
+  });
+}
+
+function runBotVotes(room) {
+  room.botsAlive().forEach((bot) => {
+    const candidates = room.alivePlayers().filter((p) => p.id !== bot.id);
+    if (candidates.length === 0) return;
+    const targetId = candidates[Math.floor(Math.random() * candidates.length)].id;
+    room.votes[bot.id] = targetId;
+  });
 }
 
 function startNightPhase(room) {
@@ -57,7 +105,7 @@ function startNightPhase(room) {
   const cursedBySiren = room.nightState.sirenCurseActive;
   const cursedByKing = room.nightState.kingCurseActive;
 
-  room.alivePlayers().forEach((player) => {
+  room.alivePlayers().filter((p) => !p.isBot).forEach((player) => {
     const role = player.role;
     const alreadyUsedOnce = role.hasNightActionOnce && room.usedOnceAbilities.has(player.id);
 
@@ -84,6 +132,8 @@ function startNightPhase(room) {
     }
   });
 
+  runBotNightActions(room);
+
   room.nightState.sirenCurseActive = false;
   room.nightState.kingCurseActive = false;
 
@@ -95,13 +145,13 @@ function resolveNight(room) {
   const ns = room.nightState;
 
   Object.entries(ns.seerResults || {}).forEach(([playerId, result]) => {
-    io.to(playerId).emit("night_action_result", result);
+    if (room.players[playerId] && room.players[playerId].socketId) io.to(playerId).emit("night_action_result", result);
   });
   Object.entries(ns.mysticResults || {}).forEach(([playerId, result]) => {
-    io.to(playerId).emit("night_action_result", result);
+    if (room.players[playerId] && room.players[playerId].socketId) io.to(playerId).emit("night_action_result", result);
   });
   Object.entries(ns.bardResults || {}).forEach(([playerId, result]) => {
-    io.to(playerId).emit("night_action_result", result);
+    if (room.players[playerId] && room.players[playerId].socketId) io.to(playerId).emit("night_action_result", result);
   });
 
   const voteCounts = {};
@@ -135,7 +185,7 @@ function resolveNight(room) {
       // Protegido por el Doctor: no muere
     } else if (victim.role.id === "lycan" && Object.values(ns.wolfVotes).includes(victimId)) {
       victim.role = require("./roles").ROLES.werewolf;
-      io.to(victim.socketId).emit("role_changed", { roleName: "Werewolf", team: "evil" });
+      if (victim.socketId) io.to(victim.socketId).emit("role_changed", { roleName: "Werewolf", team: "evil" });
     } else {
       applyDeath(room, victimId, deaths);
     }
@@ -200,6 +250,8 @@ function startVotingPhase(room) {
 
   io.to(room.code).emit("phase_change", { phase: "voting", dayNumber: room.dayNumber, durationMs: VOTING_DURATION_MS });
   sendSystemMessage(room, "Comienza la votacion. Elige a quien crees que es un lobo.");
+
+  runBotVotes(room);
 
   clearTimeout(room.phaseTimer);
   room.phaseTimer = setTimeout(() => resolveVoting(room), VOTING_DURATION_MS);
@@ -276,26 +328,52 @@ function endGame(room, winner) {
 }
 
 io.on("connection", (socket) => {
-  socket.on("create_room", ({ playerName }, callback) => {
+  socket.on("create_room", ({ playerName, avatar }, callback) => {
     const code = generateRoomCode();
     const room = new Room(code, socket.id);
-    room.addPlayer(socket.id, playerName || "Jugador");
+    room.addPlayer(socket.id, playerName || "Jugador", avatar);
     rooms[code] = room;
     socket.join(code);
     callback({ ok: true, code });
     broadcastPlayerList(room);
   });
 
-  socket.on("join_room", ({ code, playerName }, callback) => {
+  socket.on("join_room", ({ code, playerName, avatar }, callback) => {
     const room = rooms[(code || "").toUpperCase()];
     if (!room) return callback({ ok: false, error: "La sala no existe." });
     if (room.phase !== "lobby") return callback({ ok: false, error: "La partida ya comenzo." });
+    if (room.playerList().length >= MAX_PLAYERS) return callback({ ok: false, error: "La sala esta llena." });
 
-    room.addPlayer(socket.id, playerName || "Jugador");
+    room.addPlayer(socket.id, playerName || "Jugador", avatar);
     socket.join(room.code);
     callback({ ok: true, code: room.code });
     broadcastPlayerList(room);
     sendSystemMessage(room, `${playerName || "Un jugador"} se unio a la sala.`);
+  });
+
+  socket.on("add_bot", ({ code }) => {
+    const room = rooms[code];
+    if (!room) return;
+    if (socket.id !== room.hostSocketId) return;
+    if (room.phase !== "lobby") return;
+    if (room.playerList().length >= MAX_PLAYERS) return;
+
+    const bot = room.addBot();
+    broadcastPlayerList(room);
+    sendSystemMessage(room, `${bot.name} (bot) se unio a la sala para pruebas.`);
+  });
+
+  socket.on("remove_bot", ({ code, botId }) => {
+    const room = rooms[code];
+    if (!room) return;
+    if (socket.id !== room.hostSocketId) return;
+    if (room.phase !== "lobby") return;
+    const bot = room.players[botId];
+    if (!bot || !bot.isBot) return;
+
+    room.removePlayer(botId);
+    broadcastPlayerList(room);
+    sendSystemMessage(room, `${bot.name} (bot) fue eliminado de la sala.`);
   });
 
   socket.on("start_game", ({ code }) => {
@@ -305,7 +383,7 @@ io.on("connection", (socket) => {
     if (room.playerList().length < 4) return;
 
     room.assignRoles();
-    room.playerList().forEach((p) => {
+    room.playerList().filter((p) => !p.isBot).forEach((p) => {
       io.to(p.socketId).emit("role_assigned", {
         role: p.role.id,
         roleName: p.role.name,

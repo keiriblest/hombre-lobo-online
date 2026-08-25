@@ -11,6 +11,13 @@
 <div id="screen-lobby" class="screen active">
   <div class="card">
     <h1>🐺 Hombre Lobo Online</h1>
+
+    <div class="avatar-picker">
+      <img id="avatar-preview" class="avatar-preview" src="" alt="Avatar" />
+      <label for="avatar-input" class="avatar-label">Elegir foto de perfil</label>
+      <input id="avatar-input" type="file" accept="image/*" class="hidden" />
+    </div>
+
     <input id="input-name" type="text" placeholder="Tu nombre" maxlength="20" />
 
     <div class="lobby-actions">
@@ -28,6 +35,12 @@
   <div class="card">
     <h2>Sala: <span id="room-code-label"></span></h2>
     <ul id="player-list" class="player-list"></ul>
+
+    <div id="bot-controls" class="hidden">
+      <button id="btn-add-bot" class="secondary">🤖 Añadir bot de pruebas</button>
+      <p class="hint">Los bots juegan solos (acciones y votos aleatorios) para ayudarte a probar el juego y detectar errores.</p>
+    </div>
+
     <button id="btn-start" class="hidden">Iniciar partida (min. 4 jugadores)</button>
     <p id="room-hint" class="hint">Comparte el codigo de sala con tus amigos.</p>
   </div>

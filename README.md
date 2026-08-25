@@ -77,16 +77,17 @@ Inspirado en [Hombre Lobo de Plato](https://platoapp.com/es/juegos/hombre-lobo).
 ```
 hombre-lobo-online/
 ├── package.json
+├── render.yaml
 ├── server/
-│   ├── index.js         # Servidor Express + Socket.IO, fases y resolucion nocturna
-│   ├── gameState.js      # Clase Room, pool de roles (con pareja de Lover garantizada)
+│   ├── index.js         # Servidor Express + Socket.IO, fases, resolucion nocturna y bots
+│   ├── gameState.js      # Clase Room, pool de roles, gestion de bots y avatares
 │   └── roles/
 │       ├── index.js      # Registro central de los 27 roles
 │       └── *.js           # Un archivo por rol (id y nombre en ingles, descripcion en español)
 └── client/
     ├── index.html
     ├── css/style.css
-    └── js/main.js         # Incluye chat publico, chat privado de lobos y acciones especiales
+    └── js/main.js         # Chat publico, chat privado de lobos, perfil y bots
 ```
 
 ## Orden de resolucion nocturna
@@ -103,12 +104,46 @@ entre roles sean correctas:
 6. **Anuncio publico**: solo se informa si alguien murio, nunca su rol (salvo que
    el propio rol lo revele, como el Town Crier o la Princess).
 
-## Desplegar en Railway
+## Nuevas funcionalidades: perfil persistente y bots de prueba
+
+### Foto de perfil guardada en localStorage
+
+En la pantalla de lobby puedes subir una foto de perfil. La imagen se redimensiona
+en el navegador (maximo 128x128 px, JPEG comprimido) y se guarda junto con tu nombre
+en `localStorage` bajo la clave `hombreLoboProfile`. La proxima vez que abras la
+pagina, tu nombre y foto se precargan automaticamente. El avatar se envia al servidor
+como texto base64 y se muestra junto a tu nombre en la lista de jugadores.
+
+### Bots para pruebas
+
+En la sala de espera (antes de iniciar la partida), el host puede pulsar
+"Añadir bot de pruebas" para rellenar la sala con jugadores simulados. Los bots:
+
+- Reciben un rol normal como cualquier jugador al iniciar la partida.
+- De noche, eligen un objetivo aleatorio valido segun su rol (ej. los lobos
+  siempre atacan a alguien del bando bueno).
+- De dia, votan a un jugador vivo al azar durante la votacion.
+- No escriben en el chat.
+- Se identifican con la etiqueta "(bot)" y el icono 🤖 en la lista de jugadores.
+- Se pueden quitar de la sala con el boton "Quitar" mientras la partida no haya empezado.
+
+Esto permite probar el flujo completo del juego (fases, roles, condiciones de
+victoria) sin necesitar 4+ personas reales conectadas a la vez.
+
+## Desplegar en Render
+
+1. En [render.com](https://render.com), crea cuenta y conecta tu GitHub.
+2. Nuevo -> "Web Service" (o "Blueprint" si quieres que detecte `render.yaml`).
+3. Selecciona el repositorio `hombre-lobo-online`, rama `main`.
+4. Build Command: `npm install`. Start Command: `npm start`. Plan: Free.
+5. Render asigna una URL publica. En el plan Free el servicio se duerme tras 15
+   minutos sin trafico y tarda cerca de un minuto en reactivarse.
+
+## Desplegar en Railway (alternativa)
 
 1. Conecta este repositorio en Railway: "Deploy from GitHub repo".
 2. Railway detecta `package.json` y ejecuta `npm start` automaticamente.
-3. Railway asigna un dominio publico para jugar con amigos desde cualquier lugar.
-4. No se usa base de datos: el estado de las salas vive en memoria del servidor.
+3. No se usa base de datos: el estado de las salas vive en memoria del servidor.
 
 ## Notas de diseño
 
@@ -123,6 +158,9 @@ entre roles sean correctas:
   se emite solo al `socket.id` del jugador correspondiente. El chat de lobos usa
   un canal separado (`wolf_chat_message`) que solo llega a los sockets de jugadores
   con `role.team === "evil"`.
+- Los bots no tienen `socket.id` real (usan un id generado `bot_<sala>_<n>_<timestamp>`),
+  por lo que el servidor omite enviarles eventos de socket y en su lugar resuelve
+  sus acciones de forma sincronica dentro de `runBotNightActions` / `runBotVotes`.
 
 ## Siguientes pasos sugeridos
 
@@ -130,3 +168,4 @@ entre roles sean correctas:
 2. Balanceo automatico de la composicion de roles segun cantidad de jugadores.
 3. Empaquetar el cliente en Electron para version de escritorio.
 4. Animaciones de fase (amanecer/atardecer) y sonido ambiental.
+5. IA de bots mas avanzada (votar en base a sospechas simuladas, no 100% al azar).
