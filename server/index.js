@@ -64,6 +64,33 @@ function broadcastWolfVoteTally(room) {
   });
 }
 
+function getDayActionTargets(room, role) {
+  let candidates = room.alivePlayers();
+
+  if (role.id === "witch") {
+    candidates = candidates.filter((p) => p.role.team === "good");
+  } else if (role.id === "wolf_shaman") {
+    candidates = candidates.filter((p) => p.role.team === "evil");
+  }
+
+  return candidates.map((p) => ({ id: p.id, name: p.name }));
+}
+
+function sendDayActionRequests(room) {
+  room.alivePlayers().filter((p) => !p.isBot).forEach((player) => {
+    const role = player.role;
+    if (!role.hasDayActionOnce) return;
+    if (room.usedOnceAbilities.has(player.id)) return;
+
+    const targets = getDayActionTargets(room, role);
+    io.to(player.socketId).emit("day_action_request", {
+      role: role.id,
+      roleName: role.name,
+      targets,
+    });
+  });
+}
+
 function botChooseNightTarget(room, bot) {
   const role = bot.role;
   let candidates = room.alivePlayers().filter((p) => p.id !== bot.id || ["doctor", "druid"].includes(role.id));
@@ -99,6 +126,30 @@ function runBotNightActions(room) {
       if (role.id === "mystic") room.nightState.mysticResults[bot.id] = result;
       if (role.id === "bard") room.nightState.bardResults[bot.id] = result;
       if (role.id === "werewolf" || role.id === "alpha_wolf") broadcastWolfVoteTally(room);
+    }
+  });
+}
+
+function runBotDayActions(room) {
+  room.botsAlive().forEach((bot) => {
+    const role = bot.role;
+    if (!role.hasDayActionOnce) return;
+    if (room.usedOnceAbilities.has(bot.id)) return;
+
+    const targets = getDayActionTargets(room, role).filter((t) => t.id !== bot.id);
+    if (targets.length === 0) return;
+    const targetId = targets[Math.floor(Math.random() * targets.length)].id;
+
+    const result = role.resolveDayAction ? role.resolveDayAction(room, bot.id, targetId) : null;
+    if (!result) return;
+    room.usedOnceAbilities.add(bot.id);
+
+    if (result.type === "witch_reveal") {
+      sendSystemMessage(room, `La Witch revela que ${result.targetName} es ${result.roleName}.`);
+      showPopup(room, `🧙 La Witch revela: ${result.targetName} es ${result.roleName}`, "info");
+    }
+    if (result.type === "wolf_shaman_protect") {
+      sendSystemMessage(room, "El Wolf Shaman ha protegido a alguien del linchamiento de hoy.");
     }
   });
 }
@@ -325,6 +376,9 @@ function startDayPhase(room, deaths) {
   const winner = room.checkWinCondition();
   if (winner) return endGame(room, winner);
 
+  sendDayActionRequests(room);
+  runBotDayActions(room);
+
   clearTimeout(room.phaseTimer);
   room.phaseTimer = setTimeout(() => startVotingPhase(room), DAY_DURATION_MS);
 }
@@ -542,7 +596,10 @@ io.on("connection", (socket) => {
     if (room.usedOnceAbilities.has(player.id)) return;
 
     const result = role.resolveDayAction ? role.resolveDayAction(room, socket.id, targetId) : null;
-    if (!result) return;
+    if (!result) {
+      io.to(socket.id).emit("day_action_rejected", { message: "Ese jugador no es un objetivo valido para tu habilidad." });
+      return;
+    }
 
     room.usedOnceAbilities.add(player.id);
 

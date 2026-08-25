@@ -155,7 +155,6 @@ function leaveRoom() {
 }
 
 document.getElementById("btn-leave-room").addEventListener("click", leaveRoom);
-document.getElementById("btn-leave-game").addEventListener("click", leaveRoom);
 
 socket.on("player_list", (players) => {
   renderPlayerList(document.getElementById("player-list"), players, true);
@@ -239,25 +238,23 @@ function renderPlayersRing(players) {
   });
 }
 
-let roleCardAutoTimeout = null;
-
 socket.on("role_assigned", (role) => {
   state.myRole = role;
+  updateRoleChip(role);
   fillRoleCard(role);
 
-  const emojiFloating = document.getElementById("floating-role-emoji");
-  const asset = getRoleAsset(role.role);
-  emojiFloating.textContent = asset.emoji;
-
   document.getElementById("wolf-chat-panel").classList.toggle("hidden", role.team !== "evil");
+  document.getElementById("btn-close-role-detail").classList.add("hidden");
 
   showScreen("screen-role");
-
-  clearTimeout(roleCardAutoTimeout);
-  roleCardAutoTimeout = setTimeout(() => {
-    showScreen("screen-game");
-  }, 5000);
 });
+
+function updateRoleChip(role) {
+  const imgEl = document.getElementById("my-role-chip-img");
+  const fallbackEl = document.getElementById("my-role-chip-fallback");
+  const emojiEl = document.getElementById("my-role-chip-emoji");
+  applyRoleCardVisual(imgEl, fallbackEl, emojiEl, role.role);
+}
 
 function fillRoleCard(role) {
   document.getElementById("role-card-name").textContent = role.roleName;
@@ -274,20 +271,54 @@ function fillRoleCard(role) {
   cardEl.classList.toggle("card-good", role.team !== "evil");
 }
 
-document.getElementById("btn-show-my-role").addEventListener("click", () => {
+document.getElementById("my-role-chip").addEventListener("click", () => {
   if (!state.myRole) return;
   fillRoleCard(state.myRole);
+  document.getElementById("btn-close-role-detail").classList.remove("hidden");
   showScreen("screen-role");
+});
 
-  clearTimeout(roleCardAutoTimeout);
-  roleCardAutoTimeout = setTimeout(() => {
-    showScreen("screen-game");
-  }, 5000);
+document.getElementById("btn-close-role-detail").addEventListener("click", () => {
+  showScreen("screen-game");
 });
 
 socket.on("role_changed", (role) => {
   state.myRole = role;
+  updateRoleChip(role);
   addSystemChatLine(`Tu rol ha cambiado. Ahora eres: ${role.roleName}.`);
+});
+
+document.getElementById("btn-menu-toggle").addEventListener("click", () => {
+  document.getElementById("menu-dropdown").classList.toggle("hidden");
+});
+
+document.addEventListener("click", (e) => {
+  const wrapper = document.querySelector(".menu-wrapper");
+  if (wrapper && !wrapper.contains(e.target)) {
+    document.getElementById("menu-dropdown").classList.add("hidden");
+  }
+});
+
+document.getElementById("menu-item-chat").addEventListener("click", () => {
+  document.getElementById("menu-dropdown").classList.add("hidden");
+  document.getElementById("chat-drawer").classList.remove("hidden");
+});
+
+document.getElementById("menu-item-rules").addEventListener("click", () => {
+  document.getElementById("menu-dropdown").classList.add("hidden");
+  document.getElementById("rules-drawer").classList.remove("hidden");
+});
+
+document.getElementById("menu-item-leave").addEventListener("click", () => {
+  leaveRoom();
+});
+
+document.getElementById("btn-close-chat-drawer").addEventListener("click", () => {
+  document.getElementById("chat-drawer").classList.add("hidden");
+});
+
+document.getElementById("btn-close-rules-drawer").addEventListener("click", () => {
+  document.getElementById("rules-drawer").classList.add("hidden");
 });
 
 let phaseInterval = null;
@@ -318,12 +349,7 @@ socket.on("phase_change", ({ phase, dayNumber, durationMs }) => {
     document.getElementById("voting-panel").classList.remove("hidden");
     renderVotingTargets();
   } else if (phase === "day") {
-    if (state.myRole && state.myRole.hasDayActionOnce) {
-      document.getElementById("day-action-panel").classList.remove("hidden");
-      renderDayActionTargets();
-    } else {
-      document.getElementById("center-default").classList.remove("hidden");
-    }
+    document.getElementById("center-default").classList.remove("hidden");
   } else {
     document.getElementById("center-default").classList.remove("hidden");
   }
@@ -350,12 +376,14 @@ function startPhaseTimer(durationMs) {
 }
 
 socket.on("night_action_request", ({ role, roleName, targets, isOnce, isWolfVote }) => {
+  document.getElementById("center-default").classList.add("hidden");
   document.getElementById("night-action-title").textContent = isOnce
     ? `${roleName}: elige tu objetivo (habilidad unica, solo puedes usarla una vez)`
     : `${roleName}: elige tu objetivo`;
   const container = document.getElementById("night-targets");
   container.innerHTML = "";
   document.getElementById("night-wait-msg").classList.remove("hidden");
+  document.getElementById("night-panel").classList.remove("hidden");
 
   targets.forEach((t) => {
     const btn = document.createElement("div");
@@ -411,6 +439,42 @@ socket.on("night_action_result", (result) => {
   }
 });
 
+socket.on("day_action_request", ({ role, roleName, targets }) => {
+  document.getElementById("center-default").classList.add("hidden");
+  document.getElementById("day-action-panel").classList.remove("hidden");
+  document.getElementById("day-action-title").textContent = `${roleName}: elige tu objetivo (habilidad unica)`;
+
+  const msgEl = document.getElementById("day-action-msg");
+  msgEl.classList.add("hidden");
+
+  const container = document.getElementById("day-action-targets");
+  container.innerHTML = "";
+
+  if (targets.length === 0) {
+    msgEl.textContent = "No hay objetivos validos para tu habilidad en este momento.";
+    msgEl.classList.remove("hidden");
+    return;
+  }
+
+  targets.forEach((t) => {
+    const btn = document.createElement("div");
+    btn.className = "target-btn";
+    btn.textContent = t.name;
+    btn.addEventListener("click", () => {
+      container.querySelectorAll(".target-btn").forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      socket.emit("day_action", { code: state.code, targetId: t.id });
+    });
+    container.appendChild(btn);
+  });
+});
+
+socket.on("day_action_rejected", ({ message }) => {
+  const msgEl = document.getElementById("day-action-msg");
+  msgEl.textContent = message;
+  msgEl.classList.remove("hidden");
+});
+
 function renderVotingTargets() {
   const container = document.getElementById("voting-targets");
   container.innerHTML = "";
@@ -448,25 +512,6 @@ socket.on("vote_tally", ({ tally }) => {
     if (badge) badge.textContent = state.voteTally[pid] || 0;
   });
 });
-
-function renderDayActionTargets() {
-  if (!state.myRole || !state.myRole.hasDayActionOnce) return;
-  const container = document.getElementById("day-action-targets");
-  container.innerHTML = "";
-  (state.currentPlayers || [])
-    .filter((p) => p.alive && p.id !== socket.id)
-    .forEach((p) => {
-      const btn = document.createElement("div");
-      btn.className = "target-btn";
-      btn.textContent = p.name;
-      btn.addEventListener("click", () => {
-        container.querySelectorAll(".target-btn").forEach((b) => b.classList.remove("selected"));
-        btn.classList.add("selected");
-        socket.emit("day_action", { code: state.code, targetId: p.id });
-      });
-      container.appendChild(btn);
-    });
-}
 
 document.getElementById("btn-send-chat").addEventListener("click", sendChat);
 document.getElementById("chat-input").addEventListener("keydown", (e) => {

@@ -69,7 +69,7 @@
       </div>
     </div>
     <p id="role-description"></p>
-    <p class="hint">Esta pantalla se cierra sola en unos segundos. Puedes volver a ver tu carta con el boton flotante durante la partida.</p>
+    <button id="btn-close-role-detail" class="hidden">Cerrar</button>
   </div>
 </div>
 
@@ -77,10 +77,29 @@
   <div class="table-layout">
 
     <div class="table-topbar">
-      <span id="phase-label">Fase</span>
-      <span id="phase-timer"></span>
-      <span id="day-number"></span>
-      <button id="btn-leave-game" class="table-leave-btn">Salir</button>
+      <div class="table-topbar-left">
+        <span id="phase-label">Fase</span>
+        <span id="phase-timer"></span>
+        <span id="day-number"></span>
+      </div>
+
+      <div class="table-topbar-right">
+        <div id="my-role-chip" class="my-role-chip">
+          <img id="my-role-chip-img" class="my-role-chip-img" src="" alt="" />
+          <div id="my-role-chip-fallback" class="my-role-chip-fallback hidden">
+            <span id="my-role-chip-emoji"></span>
+          </div>
+        </div>
+
+        <div class="menu-wrapper">
+          <button id="btn-menu-toggle" class="menu-toggle-btn">⋮</button>
+          <div id="menu-dropdown" class="menu-dropdown hidden">
+            <button id="menu-item-chat" class="menu-item">💬 Chat / Notificaciones</button>
+            <button id="menu-item-rules" class="menu-item">📖 Reglas del juego</button>
+            <button id="menu-item-leave" class="menu-item menu-item-danger">🚪 Salir de la sala</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="table-board">
@@ -89,7 +108,7 @@
       <div class="table-center">
         <div id="center-panel" class="center-panel">
           <div id="center-default" class="center-content">
-            <p class="hint">Sigue el chat y las notificaciones para saber que ocurre en la partida.</p>
+            <p class="hint">Sigue las notificaciones (menu ⋮) para saber que ocurre en la partida.</p>
           </div>
 
           <div id="night-panel" class="center-content hidden">
@@ -104,8 +123,9 @@
           </div>
 
           <div id="day-action-panel" class="center-content hidden">
-            <h3>Habilidad especial (una vez por partida)</h3>
+            <h3 id="day-action-title">Habilidad especial (una vez por partida)</h3>
             <div id="day-action-targets" class="target-list"></div>
+            <p id="day-action-msg" class="hint hidden"></p>
           </div>
 
           <div id="voting-panel" class="center-content hidden">
@@ -116,31 +136,46 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="table-bottom">
-      <div id="wolf-chat-panel" class="panel hidden">
-        <h3>🐺 Chat privado de lobos</h3>
-        <div id="wolf-chat-log" class="chat-log"></div>
-        <div class="chat-input-row">
-          <input id="wolf-chat-input" type="text" placeholder="Solo los lobos ven esto..." maxlength="200" />
-          <button id="btn-send-wolf-chat">Enviar</button>
-        </div>
+  <div id="chat-drawer" class="chat-drawer hidden">
+    <div class="chat-drawer-header">
+      <h3>Notificaciones y chat</h3>
+      <button id="btn-close-chat-drawer" class="chat-drawer-close">✕</button>
+    </div>
+
+    <div id="wolf-chat-panel" class="panel hidden">
+      <h3>🐺 Chat privado de lobos</h3>
+      <div id="wolf-chat-log" class="chat-log"></div>
+      <div class="chat-input-row">
+        <input id="wolf-chat-input" type="text" placeholder="Solo los lobos ven esto..." maxlength="200" />
+        <button id="btn-send-wolf-chat">Enviar</button>
       </div>
+    </div>
 
-      <div id="chat-panel" class="panel">
-        <h3>Chat</h3>
-        <div id="chat-log" class="chat-log"></div>
-        <div class="chat-input-row">
-          <input id="chat-input" type="text" placeholder="Escribe un mensaje..." maxlength="200" />
-          <button id="btn-send-chat">Enviar</button>
-        </div>
+    <div id="chat-panel" class="panel">
+      <h3>Chat</h3>
+      <div id="chat-log" class="chat-log"></div>
+      <div class="chat-input-row">
+        <input id="chat-input" type="text" placeholder="Escribe un mensaje..." maxlength="200" />
+        <button id="btn-send-chat">Enviar</button>
       </div>
     </div>
   </div>
 
-  <button id="btn-show-my-role" class="floating-role-btn">
-    <span id="floating-role-emoji"></span>
-  </button>
+  <div id="rules-drawer" class="chat-drawer hidden">
+    <div class="chat-drawer-header">
+      <h3>Reglas del juego</h3>
+      <button id="btn-close-rules-drawer" class="chat-drawer-close">✕</button>
+    </div>
+    <div class="rules-content">
+      <p><strong>Objetivo:</strong> el pueblo debe encontrar y linchar a todos los lobos. Los lobos deben eliminar al pueblo hasta igualar o superar su numero.</p>
+      <p><strong>Fases:</strong> Noche (los roles con habilidad actuan en privado) → Dia (debate libre) → Votacion (se elige a quien linchar, no puedes votarte a ti mismo).</p>
+      <p><strong>Chat de lobos:</strong> solo los jugadores con rol de lobo ven ese chat y el voto nocturno de la manada.</p>
+      <p><strong>Roles especiales:</strong> toca tu carta de rol (arriba a la derecha) para ver la descripcion completa de tu habilidad en cualquier momento.</p>
+      <p><strong>Bufon (Jester):</strong> solo gana si el pueblo lo lincha o los lobos lo matan.</p>
+    </div>
+  </div>
 </div>
 
 <div id="screen-end" class="screen">
