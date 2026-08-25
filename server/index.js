@@ -14,6 +14,7 @@ app.use(express.static(path.join(__dirname, "..", "client")));
 
 const rooms = {};
 
+const START_COUNTDOWN_MS = 20 * 1000;
 const NIGHT_DURATION_MS = 45 * 1000;
 const DAY_DURATION_MS = 90 * 1000;
 const VOTING_DURATION_MS = 30 * 1000;
@@ -53,6 +54,16 @@ function sendWolfChatMessage(room, author, text) {
   });
 }
 
+function broadcastWolfVoteTally(room) {
+  const tally = {};
+  Object.entries(room.nightState.wolfVotes || {}).forEach(([voterId, targetId]) => {
+    tally[targetId] = (tally[targetId] || 0) + 1;
+  });
+  room.wolvesAlive().forEach((w) => {
+    if (w.socketId) io.to(w.socketId).emit("wolf_vote_tally", { tally });
+  });
+}
+
 function botChooseNightTarget(room, bot) {
   const role = bot.role;
   let candidates = room.alivePlayers().filter((p) => p.id !== bot.id || ["doctor", "druid"].includes(role.id));
@@ -87,6 +98,7 @@ function runBotNightActions(room) {
       if (role.id === "seer") room.nightState.seerResults[bot.id] = result;
       if (role.id === "mystic") room.nightState.mysticResults[bot.id] = result;
       if (role.id === "bard") room.nightState.bardResults[bot.id] = result;
+      if (role.id === "werewolf" || role.id === "alpha_wolf") broadcastWolfVoteTally(room);
     }
   });
 }
@@ -129,6 +141,19 @@ function broadcastVoteTally(room) {
   io.to(room.code).emit("vote_tally", { tally, detail });
 }
 
+function startInitialCountdown(room) {
+  room.phase = "starting";
+  io.to(room.code).emit("phase_change", { phase: "starting", dayNumber: 0, durationMs: START_COUNTDOWN_MS });
+  sendSystemMessage(room, "La partida comienza en unos segundos. Revisa tu rol.");
+  showPopup(room, "⏳ La partida comienza en 20 segundos...", "info");
+
+  clearTimeout(room.phaseTimer);
+  room.phaseTimer = setTimeout(() => {
+    room.dayNumber = 1;
+    startVotingPhase(room);
+  }, START_COUNTDOWN_MS);
+}
+
 function startNightPhase(room) {
   room.phase = "night";
   room.dayNumber += 1;
@@ -169,11 +194,13 @@ function startNightPhase(room) {
         roleName: role.name,
         isOnce: !!role.hasNightActionOnce,
         targets,
+        isWolfVote: role.id === "werewolf" || role.id === "alpha_wolf",
       });
     }
   });
 
   runBotNightActions(room);
+  broadcastWolfVoteTally(room);
 
   room.nightState.sirenCurseActive = false;
   room.nightState.kingCurseActive = false;
@@ -289,7 +316,7 @@ function startDayPhase(room, deaths) {
   } else {
     deaths.forEach((p) => {
       sendSystemMessage(room, `Amanece. ${p.name} fue encontrado muerto. Su rol era: ${p.role.name}.`);
-      showPopup(room, `💀 ${p.name} murio (${p.role.name})`, "death");
+      showPopup(room, `💀 ${p.name} murio de noche (${p.role.name})`, "death");
     });
   }
 
@@ -353,7 +380,7 @@ function resolveVoting(room) {
     } else {
       room.killPlayer(lynchedId);
       sendSystemMessage(room, `El pueblo vota. ${target.name} es linchado. Su rol era: ${target.role.name}.`);
-      showPopup(room, `⚖️ ${target.name} fue linchado (${target.role.name})`, "death");
+      showPopup(room, `⚖️ ${target.name} fue linchado de dia (${target.role.name})`, "death");
 
       if (target.role.id === "siren") {
         room.nightState.sirenCurseActive = true;
@@ -390,7 +417,7 @@ function endGame(room, winner) {
 
   io.to(room.code).emit("game_over", {
     winner,
-    roles: room.playerList().map((p) => ({ name: p.name, role: p.role.name, team: p.role.team })),
+    roles: room.playerList().map((p) => ({ name: p.name, role: p.role.name, roleId: p.role.id, team: p.role.team })),
   });
   sendSystemMessage(room, winnerLabels[winner] || "La partida ha terminado.");
   showPopup(room, `🏁 ${winnerLabels[winner] || "Partida terminada"}`, "gameover");
@@ -463,10 +490,25 @@ io.on("connection", (socket) => {
     });
 
     sendSystemMessage(room, "La partida ha comenzado. Revisa tu rol en privado.");
-    showPopup(room, "🎮 La partida ha comenzado", "info");
 
-    room.dayNumber = 1;
-    startVotingPhase(room);
+    startInitialCountdown(room);
+  });
+
+  socket.on("leave_room", ({ code }) => {
+    const room = rooms[code];
+    if (!room) return;
+    const player = room.players[socket.id];
+    if (!player) return;
+
+    room.removePlayer(socket.id);
+    socket.leave(code);
+    broadcastPlayerList(room);
+    sendSystemMessage(room, `${player.name} abandono la sala.`);
+
+    if (room.playerList().filter((p) => !p.isBot).length === 0) {
+      clearTimeout(room.phaseTimer);
+      delete rooms[code];
+    }
   });
 
   socket.on("night_action", ({ code, targetId }) => {
@@ -487,6 +529,7 @@ io.on("connection", (socket) => {
     if (role.id === "seer") room.nightState.seerResults[socket.id] = result;
     if (role.id === "mystic") room.nightState.mysticResults[socket.id] = result;
     if (role.id === "bard") room.nightState.bardResults[socket.id] = result;
+    if (role.id === "werewolf" || role.id === "alpha_wolf") broadcastWolfVoteTally(room);
   });
 
   socket.on("day_action", ({ code, targetId }) => {

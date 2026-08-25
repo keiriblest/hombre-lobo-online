@@ -48,7 +48,8 @@
     </div>
 
     <button id="btn-start" class="hidden">Iniciar partida (min. 4 jugadores)</button>
-    <p id="room-hint" class="hint">Comparte el codigo de sala con tus amigos. La primera votacion empieza de inmediato al iniciar.</p>
+    <button id="btn-leave-room" class="secondary">Salir de la sala</button>
+    <p id="room-hint" class="hint">Comparte el codigo de sala con tus amigos. Tras iniciar, hay 20s antes de la primera votacion.</p>
   </div>
 </div>
 
@@ -68,48 +69,62 @@
       </div>
     </div>
     <p id="role-description"></p>
-    <button id="btn-continue-role">Continuar</button>
+    <p class="hint">Esta pantalla se cierra sola en unos segundos. Puedes volver a ver tu carta con el boton flotante durante la partida.</p>
   </div>
 </div>
 
 <div id="screen-game" class="screen">
-  <div class="game-layout">
-    <div class="phase-header">
+  <div class="table-layout">
+
+    <div class="table-topbar">
       <span id="phase-label">Fase</span>
       <span id="phase-timer"></span>
       <span id="day-number"></span>
+      <button id="btn-leave-game" class="table-leave-btn">Salir</button>
     </div>
 
-    <div id="night-panel" class="panel hidden">
-      <h3 id="night-action-title">Accion nocturna</h3>
-      <div id="night-targets" class="target-list"></div>
-      <p id="night-wait-msg" class="hint">Espera a que actuen los demas roles...</p>
-    </div>
+    <div class="table-board">
+      <div id="players-ring" class="players-ring"></div>
 
-    <div id="wolf-chat-panel" class="panel hidden">
-      <h3>🐺 Chat privado de lobos</h3>
-      <div id="wolf-chat-log" class="chat-log"></div>
-      <div class="chat-input-row">
-        <input id="wolf-chat-input" type="text" placeholder="Solo los lobos ven esto..." maxlength="200" />
-        <button id="btn-send-wolf-chat">Enviar</button>
+      <div class="table-center">
+        <div id="center-panel" class="center-panel">
+          <div id="center-default" class="center-content">
+            <p class="hint">Sigue el chat y las notificaciones para saber que ocurre en la partida.</p>
+          </div>
+
+          <div id="night-panel" class="center-content hidden">
+            <h3 id="night-action-title">Accion nocturna</h3>
+            <div id="night-targets" class="target-list"></div>
+            <p id="night-wait-msg" class="hint">Espera a que actuen los demas roles...</p>
+          </div>
+
+          <div id="wolf-vote-panel" class="center-content hidden">
+            <h3>🐺 Voto de los lobos (solo lobos ven esto)</h3>
+            <div id="wolf-vote-tally" class="wolf-vote-tally"></div>
+          </div>
+
+          <div id="day-action-panel" class="center-content hidden">
+            <h3>Habilidad especial (una vez por partida)</h3>
+            <div id="day-action-targets" class="target-list"></div>
+          </div>
+
+          <div id="voting-panel" class="center-content hidden">
+            <h3>Votacion: ¿quien es sospechoso?</h3>
+            <p class="hint">No puedes votar por ti mismo. El numero es la cantidad de votos actuales.</p>
+            <div id="voting-targets" class="target-list"></div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div id="day-action-panel" class="panel hidden">
-      <h3>Habilidad especial (una vez por partida)</h3>
-      <div id="day-action-targets" class="target-list"></div>
-    </div>
-
-    <div id="voting-panel" class="panel hidden">
-      <h3>Votacion: ¿quien es sospechoso?</h3>
-      <p class="hint">No puedes votar por ti mismo. El numero en cada jugador es la cantidad de votos que tiene ahora.</p>
-      <div id="voting-targets" class="target-list"></div>
-    </div>
-
-    <div class="side-by-side">
-      <div id="players-panel" class="panel">
-        <h3>Jugadores</h3>
-        <ul id="game-player-list" class="player-list"></ul>
+    <div class="table-bottom">
+      <div id="wolf-chat-panel" class="panel hidden">
+        <h3>🐺 Chat privado de lobos</h3>
+        <div id="wolf-chat-log" class="chat-log"></div>
+        <div class="chat-input-row">
+          <input id="wolf-chat-input" type="text" placeholder="Solo los lobos ven esto..." maxlength="200" />
+          <button id="btn-send-wolf-chat">Enviar</button>
+        </div>
       </div>
 
       <div id="chat-panel" class="panel">
@@ -122,6 +137,10 @@
       </div>
     </div>
   </div>
+
+  <button id="btn-show-my-role" class="floating-role-btn">
+    <span id="floating-role-emoji"></span>
+  </button>
 </div>
 
 <div id="screen-end" class="screen">
