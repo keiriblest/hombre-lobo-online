@@ -53,9 +53,20 @@
 </div>
 
 <div id="screen-role" class="screen">
-  <div class="card">
+  <div class="card card-wide">
     <h2>Tu rol</h2>
-    <div id="role-name" class="role-badge"></div>
+    <div class="role-card-wrapper">
+      <div id="role-card" class="role-card">
+        <img id="role-card-img" class="role-card-img" src="" alt="" />
+        <div id="role-card-fallback" class="role-card-fallback hidden">
+          <span id="role-card-emoji" class="role-card-emoji"></span>
+        </div>
+        <div class="role-card-footer">
+          <div id="role-card-name" class="role-card-name"></div>
+          <div id="role-card-team" class="role-card-team"></div>
+        </div>
+      </div>
+    </div>
     <p id="role-description"></p>
     <button id="btn-continue-role">Continuar</button>
   </div>
@@ -114,14 +125,15 @@
 </div>
 
 <div id="screen-end" class="screen">
-  <div class="card">
+  <div class="card card-wide">
     <h2 id="end-title"></h2>
-    <ul id="end-roles" class="player-list"></ul>
+    <div id="end-roles-cards" class="end-roles-grid"></div>
     <button id="btn-back-lobby">Volver al lobby</button>
   </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="js/roleAssets.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

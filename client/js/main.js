@@ -198,8 +198,19 @@ function renderPlayerList(ul, players, showRemoveBot) {
 
 socket.on("role_assigned", (role) => {
   state.myRole = role;
-  document.getElementById("role-name").textContent = `${role.roleName} (${role.team === "evil" ? "Malo" : "Bueno"})`;
+  document.getElementById("role-card-name").textContent = role.roleName;
+  document.getElementById("role-card-team").textContent = role.team === "evil" ? "Bando: Malo" : "Bando: Bueno";
   document.getElementById("role-description").textContent = role.description;
+
+  const imgEl = document.getElementById("role-card-img");
+  const fallbackEl = document.getElementById("role-card-fallback");
+  const emojiEl = document.getElementById("role-card-emoji");
+  applyRoleCardVisual(imgEl, fallbackEl, emojiEl, role.role);
+
+  const cardEl = document.getElementById("role-card");
+  cardEl.classList.toggle("card-evil", role.team === "evil");
+  cardEl.classList.toggle("card-good", role.team !== "evil");
+
   document.getElementById("wolf-chat-panel").classList.toggle("hidden", role.team !== "evil");
   showScreen("screen-role");
 });
@@ -406,12 +417,37 @@ socket.on("game_over", ({ winner, roles }) => {
   const titles = { good: "🎉 El pueblo ha ganado", evil: "🐺 Los lobos han ganado", jester: "🏏 El Jester ha ganado" };
   document.getElementById("end-title").textContent = titles[winner] || "Partida terminada";
 
-  const ul = document.getElementById("end-roles");
-  ul.innerHTML = "";
+  const container = document.getElementById("end-roles-cards");
+  container.innerHTML = "";
+
   roles.forEach((r) => {
-    const li = document.createElement("li");
-    li.textContent = `${r.name} - ${r.role}`;
-    ul.appendChild(li);
+    const roleId = r.roleId || null;
+    const card = document.createElement("div");
+    card.className = "mini-role-card" + (r.team === "evil" ? " card-evil" : " card-good");
+
+    const img = document.createElement("img");
+    img.className = "mini-role-card-img";
+    const fallback = document.createElement("div");
+    fallback.className = "mini-role-card-fallback hidden";
+    const emojiSpan = document.createElement("span");
+    fallback.appendChild(emojiSpan);
+
+    if (roleId) {
+      applyRoleCardVisual(img, fallback, emojiSpan, roleId);
+    } else {
+      img.classList.add("hidden");
+      fallback.classList.remove("hidden");
+      emojiSpan.textContent = "❓";
+    }
+
+    const label = document.createElement("div");
+    label.className = "mini-role-card-label";
+    label.innerHTML = `<strong>${r.name}</strong><br>${r.role}`;
+
+    card.appendChild(img);
+    card.appendChild(fallback);
+    card.appendChild(label);
+    container.appendChild(card);
   });
 
   showScreen("screen-end");
