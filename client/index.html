@@ -96,42 +96,20 @@
       </div>
     </div>
 
+    <div id="action-banner" class="action-banner hidden">
+      <span id="action-banner-text"></span>
+    </div>
+
     <div class="table-board">
       <div id="players-ring" class="players-ring"></div>
+    </div>
 
-      <div class="table-center">
-        <div id="center-panel" class="center-panel">
-
-          <div id="center-announcement" class="center-content">
-            <div class="announcement-icon" id="announcement-icon">📢</div>
-            <p id="announcement-text" class="announcement-text">Bienvenido a la partida. Aqui veras los anuncios importantes.</p>
-          </div>
-
-          <div id="night-panel" class="center-content hidden">
-            <h3 id="night-action-title">Accion nocturna</h3>
-            <div id="night-targets" class="target-list"></div>
-            <p id="night-wait-msg" class="hint">Espera a que actuen los demas roles...</p>
-            <p id="night-action-msg" class="hint hidden"></p>
-          </div>
-
-          <div id="wolf-vote-panel" class="center-content hidden">
-            <h3>🐺 Voto de los lobos (solo lobos ven esto)</h3>
-            <div id="wolf-vote-tally" class="wolf-vote-tally"></div>
-          </div>
-
-          <div id="day-action-panel" class="center-content hidden">
-            <h3 id="day-action-title">Habilidad especial (una vez por partida)</h3>
-            <div id="day-action-targets" class="target-list"></div>
-            <p id="day-action-msg" class="hint hidden"></p>
-          </div>
-
-          <div id="voting-panel" class="center-content hidden">
-            <h3>Votacion: ¿quien es sospechoso?</h3>
-            <p class="hint">No puedes votar por ti mismo. El numero es la cantidad de votos actuales.</p>
-            <div id="voting-targets" class="target-list"></div>
-          </div>
-        </div>
+    <div id="announcement-feed" class="announcement-feed">
+      <div id="announcement-current" class="announcement-current">
+        <span id="announcement-icon" class="announcement-icon-big">📢</span>
+        <span id="announcement-text" class="announcement-text-big">Bienvenido a la partida.</span>
       </div>
+      <div id="announcement-history" class="announcement-history"></div>
     </div>
 
     <div class="chat-bar">
@@ -151,6 +129,17 @@
     </div>
   </div>
 
+  <div id="action-confirm-modal" class="action-modal hidden">
+    <div class="action-modal-box">
+      <div id="action-modal-avatar" class="action-modal-avatar"></div>
+      <p id="action-modal-text" class="action-modal-text"></p>
+      <div class="action-modal-buttons">
+        <button id="btn-action-confirm" class="action-modal-confirm">Confirmar</button>
+        <button id="btn-action-cancel" class="secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="chat-history-drawer" class="chat-drawer hidden">
     <div class="chat-drawer-header">
       <h3>Historial del chat</h3>
@@ -166,6 +155,7 @@
     </div>
     <div class="rules-content">
       <p><strong>Objetivo:</strong> el pueblo debe encontrar y linchar a todos los lobos. Los lobos deben eliminar al pueblo hasta igualar o superar su numero.</p>
+      <p><strong>Como actuar:</strong> toca directamente el avatar de un jugador en el tablero para votar, atacar o usar tu habilidad sobre esa persona, segun la fase y tu rol.</p>
       <p><strong>Fases:</strong> Noche (los roles con habilidad actuan en privado) → Dia (debate libre) → Votacion (se elige a quien linchar, no puedes votarte a ti mismo).</p>
       <p><strong>Chat de lobos:</strong> visible en el mismo chat con estilo distinto, solo los jugadores con rol de lobo lo ven y pueden usarlo.</p>
       <p><strong>Amantes (Cupido):</strong> al inicio de la partida, 2 jugadores al azar (de cualquier rol o bando) son marcados como Amantes. Tienen su propio chat privado. Si uno muere, el otro muere de pena. Si son los ultimos 2 supervivientes, ganan juntos sin importar su bando original.</p>

@@ -12,8 +12,10 @@ let state = {
   currentPlayers: [],
   voteTally: {},
   wolfVoteTally: {},
-  currentCenterView: "announcement",
   isLover: false,
+  pendingAction: null,
+  selectedTargetId: null,
+  announcementHistory: [],
 };
 
 function showScreen(id) {
@@ -198,6 +200,7 @@ function renderPlayersRing(players) {
   players.forEach((p) => {
     const token = document.createElement("div");
     token.className = "player-token" + (!p.alive ? " dead" : "") + (p.id === socket.id ? " me" : "");
+    token.dataset.playerId = p.id;
 
     const avatarWrapper = document.createElement("div");
     avatarWrapper.className = "player-token-avatar-wrapper";
@@ -214,6 +217,11 @@ function renderPlayersRing(players) {
     status.textContent = p.alive ? "🟢" : "💀";
     avatarWrapper.appendChild(status);
 
+    const voteBadge = document.createElement("span");
+    voteBadge.className = "player-token-vote-badge hidden";
+    voteBadge.dataset.role = "voteBadge";
+    avatarWrapper.appendChild(voteBadge);
+
     const name = document.createElement("div");
     name.className = "player-token-name";
     name.textContent = p.name + (p.id === socket.id ? " (tu)" : "");
@@ -221,7 +229,87 @@ function renderPlayersRing(players) {
     token.appendChild(avatarWrapper);
     token.appendChild(name);
     ring.appendChild(token);
+
+    const isValidTarget = state.pendingAction && p.alive && isValidActionTarget(p.id);
+    token.classList.toggle("actionable", !!isValidTarget);
+
+    if (isValidTarget) {
+      token.addEventListener("click", () => openActionModal(p));
+    }
   });
+
+  updateVoteBadges();
+}
+
+function isValidActionTarget(playerId) {
+  if (!state.pendingAction) return false;
+  if (playerId === socket.id && state.pendingAction.excludeSelf) return false;
+  return state.pendingAction.validTargetIds.includes(playerId);
+}
+
+function openActionModal(targetPlayer) {
+  if (!state.pendingAction) return;
+  state.selectedTargetId = targetPlayer.id;
+
+  const avatarEl = document.getElementById("action-modal-avatar");
+  avatarEl.innerHTML = targetPlayer.avatar
+    ? `<img src="${targetPlayer.avatar}" />`
+    : `<span>${targetPlayer.isBot ? "🤖" : "👤"}</span>`;
+
+  document.getElementById("action-modal-text").textContent =
+    `${state.pendingAction.label} a ${targetPlayer.name}?`;
+
+  document.getElementById("action-confirm-modal").classList.remove("hidden");
+}
+
+document.getElementById("btn-action-cancel").addEventListener("click", closeActionModal);
+
+function closeActionModal() {
+  document.getElementById("action-confirm-modal").classList.add("hidden");
+  state.selectedTargetId = null;
+}
+
+document.getElementById("btn-action-confirm").addEventListener("click", () => {
+  if (!state.pendingAction || !state.selectedTargetId) return;
+
+  const { type } = state.pendingAction;
+  const targetId = state.selectedTargetId;
+
+  if (type === "vote") {
+    socket.emit("day_vote", { code: state.code, targetId });
+  } else if (type === "night") {
+    socket.emit("night_action", { code: state.code, targetId });
+    if (state.pendingAction.isWolfVote) {
+      showWolfVoteView();
+    }
+  } else if (type === "day") {
+    socket.emit("day_action", { code: state.code, targetId });
+  }
+
+  closeActionModal();
+});
+
+function setPendingAction(actionConfig) {
+  state.pendingAction = actionConfig;
+  renderPlayersRing(state.currentPlayers);
+  updateActionBanner();
+}
+
+function clearPendingAction() {
+  state.pendingAction = null;
+  renderPlayersRing(state.currentPlayers);
+  updateActionBanner();
+}
+
+function updateActionBanner() {
+  const banner = document.getElementById("action-banner");
+  const textEl = document.getElementById("action-banner-text");
+  if (state.pendingAction) {
+    textEl.textContent = "👉 " + state.pendingAction.label + ". Toca a un jugador en el tablero.";
+    banner.classList.remove("hidden");
+  } else {
+    banner.classList.add("hidden");
+  }
 }
 
 socket.on("role_assigned", (role) => {
@@ -295,7 +383,7 @@ socket.on("role_changed", (role) => {
   state.myRole = role;
   updateRoleChip(role);
   updateChatChannelOptions();
-  setAnnouncement(`Tu rol ha cambiado. Ahora eres: ${role.roleName}.`, "🐺");
+  pushAnnouncement(`Tu rol ha cambiado. Ahora eres: ${role.roleName}.`, "🐺");
 });
 
 document.getElementById("btn-menu-toggle").addEventListener("click", () => {
@@ -322,13 +410,34 @@ document.getElementById("btn-close-rules-drawer").addEventListener("click", () =
   document.getElementById("rules-drawer").classList.add("hidden");
 });
 
-function setAnnouncement(text, icon) {
+function pushAnnouncement(text, icon) {
+  const currentText = document.getElementById("announcement-text").textContent;
+  const currentIcon = document.getElementById("announcement-icon").textContent;
+
+  if (currentText && currentText !== "Bienvenido a la partida.") {
+    state.announcementHistory.unshift({ text: currentText, icon: currentIcon });
+    state.announcementHistory = state.announcementHistory.slice(0, 4);
+  }
+
   document.getElementById("announcement-text").textContent = text;
   document.getElementById("announcement-icon").textContent = icon || "📢";
 
-  hideAllCenterPanels();
-  document.getElementById("center-announcement").classList.remove("hidden");
-  state.currentCenterView = "announcement";
+  const currentBox = document.getElementById("announcement-current");
+  currentBox.classList.remove("pulse");
+  requestAnimationFrame(() => currentBox.classList.add("pulse"));
+
+  renderAnnouncementHistory();
+}
+
+function renderAnnouncementHistory() {
+  const container = document.getElementById("announcement-history");
+  container.innerHTML = "";
+  state.announcementHistory.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "announcement-history-item";
+    row.innerHTML = `<span>${item.icon}</span><span>${item.text}</span>`;
+    container.appendChild(row);
+  });
 }
 
 let phaseInterval = null;
@@ -340,36 +449,23 @@ socket.on("phase_change", ({ phase, dayNumber, durationMs }) => {
   const labels = { starting: "⏳ Preparando", night: "🌙 Noche", day: "☀️ Debate", voting: "🗳️ Votacion" };
   document.getElementById("phase-label").textContent = labels[phase] || phase;
 
-  hideAllCenterPanels();
+  document.getElementById("action-confirm-modal").classList.add("hidden");
 
-  if (phase === "night") {
-    document.getElementById("night-targets").innerHTML = "";
-    document.getElementById("night-wait-msg").classList.remove("hidden");
-    document.getElementById("night-action-msg").classList.add("hidden");
-    document.getElementById("night-panel").classList.remove("hidden");
-    state.currentCenterView = "night";
-    if (state.myRole && state.myRole.team === "evil") {
-      state.wolfVoteTally = {};
-      renderWolfVoteTally();
-    }
-  } else if (phase === "voting") {
-    state.voteTally = {};
-    document.getElementById("voting-panel").classList.remove("hidden");
-    state.currentCenterView = "voting";
-    renderVotingTargets();
-  } else {
-    document.getElementById("center-announcement").classList.remove("hidden");
-    state.currentCenterView = "announcement";
+  if (phase === "voting") {
+    const validIds = (state.currentPlayers || [])
+      .filter((p) => p.alive && p.id !== socket.id)
+      .map((p) => p.id);
+    setPendingAction({ type: "vote", label: "Votar por", validTargetIds: validIds, excludeSelf: true });
+  } else if (phase !== "night" && phase !== "day") {
+    clearPendingAction();
+  }
+
+  if (phase === "night" && state.myRole && state.myRole.team === "evil") {
+    state.wolfVoteTally = {};
   }
 
   startPhaseTimer(durationMs);
 });
-
-function hideAllCenterPanels() {
-  ["center-announcement", "night-panel", "wolf-vote-panel", "day-action-panel", "voting-panel"].forEach((id) => {
-    document.getElementById(id).classList.add("hidden");
-  });
-}
 
 function startPhaseTimer(durationMs) {
   clearInterval(phaseInterval);
@@ -384,165 +480,103 @@ function startPhaseTimer(durationMs) {
 }
 
 socket.on("night_action_request", ({ role, roleName, targets, isOnce, isWolfVote }) => {
-  hideAllCenterPanels();
-  document.getElementById("night-action-title").textContent = isOnce
-    ? `${roleName}: elige tu objetivo (habilidad unica, solo puedes usarla una vez)`
-    : `${roleName}: elige tu objetivo`;
-  const container = document.getElementById("night-targets");
-  container.innerHTML = "";
-  document.getElementById("night-panel").classList.remove("hidden");
-  state.currentCenterView = "night";
-
-  const msgEl = document.getElementById("night-action-msg");
-  const waitEl = document.getElementById("night-wait-msg");
-
   if (!targets || targets.length === 0) {
-    waitEl.classList.add("hidden");
-    msgEl.textContent = role === "necromancer"
-      ? "Aun no hay ningun jugador bueno muerto para revivir. Podras usar tu habilidad cuando alguien muera."
-      : "No hay objetivos validos para tu habilidad en este momento.";
-    msgEl.classList.remove("hidden");
+    clearPendingAction();
+    pushAnnouncement(
+      role === "necromancer"
+        ? "No hay ningun jugador bueno muerto todavia para que el Necromancer lo reviva."
+        : `${roleName}: no hay objetivos validos para tu habilidad esta noche.`,
+      "🌙"
+    );
     return;
   }
 
-  msgEl.classList.add("hidden");
-  waitEl.classList.remove("hidden");
-
-  targets.forEach((t) => {
-    const btn = document.createElement("div");
-    btn.className = "target-btn";
-    btn.textContent = t.name;
-    btn.addEventListener("click", () => {
-      container.querySelectorAll(".target-btn").forEach((b) => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      socket.emit("night_action", { code: state.code, targetId: t.id });
-
-      if (isWolfVote) {
-        showWolfVoteView();
-      }
-    });
-    container.appendChild(btn);
+  const validIds = targets.map((t) => t.id);
+  setPendingAction({
+    type: "night",
+    label: isOnce ? `${roleName} (habilidad unica): usar en` : `${roleName}: usar habilidad en`,
+    validTargetIds: validIds,
+    excludeSelf: false,
+    isWolfVote: !!isWolfVote,
   });
+
+  if (isWolfVote) {
+    showWolfVoteView();
+  }
 });
 
 function showWolfVoteView() {
-  hideAllCenterPanels();
-  document.getElementById("wolf-vote-panel").classList.remove("hidden");
-  state.currentCenterView = "night";
   renderWolfVoteTally();
 }
 
 socket.on("wolf_vote_tally", ({ tally }) => {
   state.wolfVoteTally = tally || {};
   renderWolfVoteTally();
+  updateVoteBadges();
 });
 
 function renderWolfVoteTally() {
-  const container = document.getElementById("wolf-vote-tally");
-  if (!container) return;
-  container.innerHTML = "";
-
+  if (!state.wolfVoteTally) return;
   const entries = Object.entries(state.wolfVoteTally);
-  if (entries.length === 0) {
-    container.innerHTML = '<p class="hint">Nadie ha votado todavia.</p>';
-    return;
-  }
-
-  entries.forEach(([targetId, count]) => {
+  if (entries.length === 0) return;
+  const summary = entries.map(([targetId, count]) => {
     const target = (state.currentPlayers || []).find((p) => p.id === targetId);
-    const row = document.createElement("div");
-    row.className = "wolf-vote-row";
-    row.innerHTML = `<span>${target ? target.name : "?"}</span><span>${count} voto(s)</span>`;
-    container.appendChild(row);
-  });
+    return `${target ? target.name : "?"}: ${count}`;
+  }).join(", ");
+  pushAnnouncement(`🐺 Voto de los lobos: ${summary}`, "🐺");
 }
 
 socket.on("night_action_result", (result) => {
   if (result.type === "seer_result") {
-    setAnnouncement(`(privado) Investigaste a ${result.targetName}: es del bando ${result.alignment}.`, "🔮");
+    pushAnnouncement(`(privado) Investigaste a ${result.targetName}: es del bando ${result.alignment}.`, "🔮");
   }
   if (result.type === "mystic_reveal") {
-    setAnnouncement(`(privado) El Mystic descubre que ese jugador es: ${result.roleName}.`, "🧿");
+    pushAnnouncement(`(privado) El Mystic descubre que ese jugador es: ${result.roleName}.`, "🧿");
   }
   if (result.type === "bard_exchange") {
-    setAnnouncement(`(privado) Intercambio de informacion: ${result.targetName} es ${result.targetRoleName}.`, "🎵");
+    pushAnnouncement(`(privado) Intercambio de informacion: ${result.targetName} es ${result.targetRoleName}.`, "🎵");
   }
 });
 
 socket.on("day_action_request", ({ role, roleName, targets }) => {
-  hideAllCenterPanels();
-  document.getElementById("day-action-panel").classList.remove("hidden");
-  document.getElementById("day-action-title").textContent = `${roleName}: elige tu objetivo (habilidad unica)`;
-  state.currentCenterView = "day-action";
-
-  const msgEl = document.getElementById("day-action-msg");
-  msgEl.classList.add("hidden");
-
-  const container = document.getElementById("day-action-targets");
-  container.innerHTML = "";
-
-  if (targets.length === 0) {
-    msgEl.textContent = "No hay objetivos validos para tu habilidad en este momento.";
-    msgEl.classList.remove("hidden");
+  if (!targets || targets.length === 0) {
+    clearPendingAction();
+    pushAnnouncement(`${roleName}: no hay objetivos validos para tu habilidad en este momento.`, "☀️");
     return;
   }
 
-  targets.forEach((t) => {
-    const btn = document.createElement("div");
-    btn.className = "target-btn";
-    btn.textContent = t.name;
-    btn.addEventListener("click", () => {
-      container.querySelectorAll(".target-btn").forEach((b) => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      socket.emit("day_action", { code: state.code, targetId: t.id });
-    });
-    container.appendChild(btn);
+  const validIds = targets.map((t) => t.id);
+  setPendingAction({
+    type: "day",
+    label: `${roleName} (habilidad unica): usar en`,
+    validTargetIds: validIds,
+    excludeSelf: false,
   });
 });
 
 socket.on("day_action_rejected", ({ message }) => {
-  const msgEl = document.getElementById("day-action-msg");
-  msgEl.textContent = message;
-  msgEl.classList.remove("hidden");
+  pushAnnouncement(message, "⚠️");
 });
-
-function renderVotingTargets() {
-  const container = document.getElementById("voting-targets");
-  container.innerHTML = "";
-  (state.currentPlayers || [])
-    .filter((p) => p.alive && p.id !== socket.id)
-    .forEach((p) => {
-      const btn = document.createElement("div");
-      btn.className = "target-btn vote-target";
-      btn.dataset.playerId = p.id;
-
-      const countBadge = document.createElement("span");
-      countBadge.className = "vote-count-badge";
-      countBadge.textContent = state.voteTally[p.id] || 0;
-
-      const label = document.createElement("span");
-      label.textContent = p.name;
-
-      btn.appendChild(label);
-      btn.appendChild(countBadge);
-
-      btn.addEventListener("click", () => {
-        container.querySelectorAll(".target-btn").forEach((b) => b.classList.remove("selected"));
-        btn.classList.add("selected");
-        socket.emit("day_vote", { code: state.code, targetId: p.id });
-      });
-      container.appendChild(btn);
-    });
-}
 
 socket.on("vote_tally", ({ tally }) => {
   state.voteTally = tally || {};
-  document.querySelectorAll(".vote-target").forEach((btn) => {
-    const pid = btn.dataset.playerId;
-    const badge = btn.querySelector(".vote-count-badge");
-    if (badge) badge.textContent = state.voteTally[pid] || 0;
-  });
+  updateVoteBadges();
 });
+
+function updateVoteBadges() {
+  document.querySelectorAll(".player-token").forEach((token) => {
+    const pid = token.dataset.playerId;
+    const badge = token.querySelector('[data-role="voteBadge"]');
+    if (!badge) return;
+    const count = state.voteTally && state.voteTally[pid];
+    if (count) {
+      badge.textContent = count;
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
+  });
+}
 
 document.getElementById("btn-send-chat").addEventListener("click", sendChat);
 document.getElementById("chat-input").addEventListener("keydown", (e) => {
@@ -572,7 +606,7 @@ socket.on("chat_message", (msg) => {
   addChatLine(msg.author, msg.text, kind);
 
   if (kind === "system") {
-    setAnnouncement(msg.text, pickAnnouncementIcon(msg.text));
+    pushAnnouncement(msg.text, pickAnnouncementIcon(msg.text));
     return;
   }
 
