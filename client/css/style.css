@@ -1,0 +1,159 @@
+/* client/css/style.css */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  background: linear-gradient(160deg, #1a1a2e 0%, #16213e 100%);
+  color: #eaeaea;
+  min-height: 100vh;
+}
+
+.screen {
+  display: none;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.screen.active { display: flex; }
+
+.card {
+  background: #22223b;
+  border-radius: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+
+h1 { text-align: center; margin-top: 0; }
+h2, h3 { margin-top: 0; }
+
+input {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #1a1a2e;
+  color: #eaeaea;
+  font-size: 15px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border: none;
+  border-radius: 8px;
+  background: #e94560;
+  color: white;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+button:hover { opacity: 0.85; }
+button.secondary { background: #0f3460; }
+
+.join-row { display: flex; gap: 8px; }
+.join-row input { flex: 1; }
+.join-row button { width: auto; padding: 12px 18px; }
+
+.error { color: #ff6b6b; min-height: 20px; }
+.hint { color: #9a9a9a; font-size: 13px; }
+
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.player-list li {
+  padding: 8px 12px;
+  background: #1a1a2e;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+.player-list li.dead { opacity: 0.4; text-decoration: line-through; }
+
+.role-badge {
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+  padding: 16px;
+  border-radius: 12px;
+  background: #0f3460;
+  margin-bottom: 12px;
+}
+
+.game-layout {
+  width: 100%;
+  max-width: 900px;
+  padding: 16px;
+}
+
+.phase-header {
+  display: flex;
+  justify-content: space-between;
+  background: #0f3460;
+  padding: 14px 20px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  font-weight: bold;
+}
+
+.panel {
+  background: #22223b;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.panel.hidden { display: none; }
+
+.target-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.target-btn {
+  padding: 10px 14px;
+  background: #0f3460;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.target-btn.selected { border-color: #e94560; }
+.target-btn:hover { background: #1a4a7a; }
+
+.side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 16px;
+}
+@media (max-width: 700px) {
+  .side-by-side { grid-template-columns: 1fr; }
+}
+
+.chat-log {
+  height: 220px;
+  overflow-y: auto;
+  background: #1a1a2e;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.chat-log .msg { margin-bottom: 6px; }
+.chat-log .msg .author { font-weight: bold; color: #e94560; }
+.chat-log .msg.system { color: #f4a261; font-style: italic; }
+
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input-row input { flex: 1; margin: 0; }
+.chat-input-row button { width: auto; padding: 10px 16px; margin: 0; }
+
+.hidden { display: none !important; }
