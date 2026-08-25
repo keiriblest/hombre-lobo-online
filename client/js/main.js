@@ -342,6 +342,7 @@ socket.on("phase_change", ({ phase, dayNumber, durationMs }) => {
   if (phase === "night") {
     document.getElementById("night-targets").innerHTML = "";
     document.getElementById("night-wait-msg").classList.remove("hidden");
+    document.getElementById("night-action-msg").classList.add("hidden");
     document.getElementById("night-panel").classList.remove("hidden");
     state.currentCenterView = "night";
     if (state.myRole && state.myRole.team === "evil") {
@@ -386,9 +387,23 @@ socket.on("night_action_request", ({ role, roleName, targets, isOnce, isWolfVote
     : `${roleName}: elige tu objetivo`;
   const container = document.getElementById("night-targets");
   container.innerHTML = "";
-  document.getElementById("night-wait-msg").classList.remove("hidden");
   document.getElementById("night-panel").classList.remove("hidden");
   state.currentCenterView = "night";
+
+  const msgEl = document.getElementById("night-action-msg");
+  const waitEl = document.getElementById("night-wait-msg");
+
+  if (!targets || targets.length === 0) {
+    waitEl.classList.add("hidden");
+    msgEl.textContent = role === "necromancer"
+      ? "Aun no hay ningun jugador bueno muerto para revivir. Podras usar tu habilidad cuando alguien muera."
+      : "No hay objetivos validos para tu habilidad en este momento.";
+    msgEl.classList.remove("hidden");
+    return;
+  }
+
+  msgEl.classList.add("hidden");
+  waitEl.classList.remove("hidden");
 
   targets.forEach((t) => {
     const btn = document.createElement("div");
