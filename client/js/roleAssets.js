@@ -2,9 +2,11 @@
 // Mapa central de assets visuales por rol. Si la imagen no carga (404), se usa el
 // emoji y color de fallback definidos aqui, para que la interfaz nunca se rompa.
 //
-// Para agregar las imagenes reales: coloca los archivos en client/images/roles/
-// con el nombre exacto "<role_id>.webp" (ej. werewolf.webp, alpha_wolf.webp, etc.)
-// Si tus imagenes tienen otra extension, cambia IMAGE_EXTENSION mas abajo.
+// Las imagenes siguen el patron de nombre: card_<roleIdSinGuionBajo>.webp
+// Ejemplos: werewolf -> card_werewolf.webp, alpha_wolf -> card_alphawolf.webp,
+// wolf_shaman -> card_wolfshaman.webp, town_crier -> card_towncrier.webp
+//
+// Coloca los archivos en client/images/roles/ con esos nombres exactos.
 
 const IMAGE_EXTENSION = "webp";
 const IMAGE_BASE_PATH = "images/roles";
@@ -39,8 +41,13 @@ const ROLE_ASSETS = {
   bard:         { emoji: "🎵", color: "#e07a5f" },
 };
 
+function getRoleImageFileName(roleId) {
+  const compact = roleId.replace(/_/g, "");
+  return `card_${compact}.${IMAGE_EXTENSION}`;
+}
+
 function getRoleImageUrl(roleId) {
-  return `${IMAGE_BASE_PATH}/${roleId}.${IMAGE_EXTENSION}`;
+  return `${IMAGE_BASE_PATH}/${getRoleImageFileName(roleId)}`;
 }
 
 function getRoleAsset(roleId) {
