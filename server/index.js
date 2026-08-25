@@ -317,6 +317,8 @@ function resolveNight(room) {
     } else if (victim.role.id === "lycan" && Object.values(ns.wolfVotes).includes(victimId)) {
       victim.role = require("./roles").ROLES.werewolf;
       if (victim.socketId) io.to(victim.socketId).emit("role_changed", { roleName: "Werewolf", team: "evil" });
+      sendSystemMessage(room, `Los lobos atacaron a ${victim.name} en la noche, pero se ha transformado en Werewolf y ahora es parte de la manada.`);
+      showPopup(room, `🐺 ${victim.name} se transformo en Werewolf`, "info");
     } else {
       applyDeath(room, victimId, deaths);
     }
@@ -366,7 +368,7 @@ function startDayPhase(room, deaths) {
     showPopup(room, "☀️ Amanece. Nadie murio esta noche", "day");
   } else {
     deaths.forEach((p) => {
-      sendSystemMessage(room, `Amanece. ${p.name} fue encontrado muerto. Su rol era: ${p.role.name}.`);
+      sendSystemMessage(room, `Amanece. ${p.name} fue atacado por los lobos durante la noche. Su rol era: ${p.role.name}.`);
       showPopup(room, `💀 ${p.name} murio de noche (${p.role.name})`, "death");
     });
   }
@@ -433,7 +435,7 @@ function resolveVoting(room) {
       showPopup(room, `👑 ${target.name} revela ser la Princess y sobrevive`, "info");
     } else {
       room.killPlayer(lynchedId);
-      sendSystemMessage(room, `El pueblo vota. ${target.name} es linchado. Su rol era: ${target.role.name}.`);
+      sendSystemMessage(room, `${target.name} fue linchado por el pueblo. Su rol era: ${target.role.name}.`);
       showPopup(room, `⚖️ ${target.name} fue linchado de dia (${target.role.name})`, "death");
 
       if (target.role.id === "siren") {
