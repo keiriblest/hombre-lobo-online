@@ -8,12 +8,6 @@
 </head>
 <body>
 
-<div id="popup-overlay" class="popup-overlay hidden">
-  <div id="popup-box" class="popup-box">
-    <span id="popup-text"></span>
-  </div>
-</div>
-
 <div id="screen-lobby" class="screen active">
   <div class="card">
     <h1>🐺 Hombre Lobo Online</h1>
@@ -69,6 +63,7 @@
       </div>
     </div>
     <p id="role-description"></p>
+    <p id="role-lover-note" class="hint lover-note hidden"></p>
     <button id="btn-close-role-detail" class="hidden">Cerrar</button>
   </div>
 </div>
@@ -145,19 +140,13 @@
         <span id="chat-bubble-text" class="chat-bubble-text"></span>
       </div>
       <div class="chat-bar-input-row">
+        <select id="chat-channel-select" class="chat-channel-select hidden">
+          <option value="public">💬 Publico</option>
+          <option value="wolf">🐺 Lobos</option>
+          <option value="lover">💕 Amantes</option>
+        </select>
         <input id="chat-input" type="text" placeholder="Escribe un mensaje..." maxlength="200" />
         <button id="btn-send-chat">Enviar</button>
-      </div>
-    </div>
-
-    <div id="wolf-chat-bar" class="chat-bar wolf-chat-bar hidden">
-      <div id="wolf-chat-bubble" class="chat-bubble wolf-bubble hidden">
-        <span id="wolf-chat-bubble-author" class="chat-bubble-author"></span>
-        <span id="wolf-chat-bubble-text" class="chat-bubble-text"></span>
-      </div>
-      <div class="chat-bar-input-row">
-        <input id="wolf-chat-input" type="text" placeholder="🐺 Solo los lobos ven esto..." maxlength="200" />
-        <button id="btn-send-wolf-chat">Enviar</button>
       </div>
     </div>
   </div>
@@ -170,14 +159,6 @@
     <div id="chat-log" class="chat-log chat-log-full"></div>
   </div>
 
-  <div id="wolf-chat-history-drawer" class="chat-drawer hidden">
-    <div class="chat-drawer-header">
-      <h3>🐺 Historial del chat de lobos</h3>
-      <button id="btn-close-wolf-chat-history" class="chat-drawer-close">✕</button>
-    </div>
-    <div id="wolf-chat-log" class="chat-log chat-log-full"></div>
-  </div>
-
   <div id="rules-drawer" class="chat-drawer hidden">
     <div class="chat-drawer-header">
       <h3>Reglas del juego</h3>
@@ -186,8 +167,8 @@
     <div class="rules-content">
       <p><strong>Objetivo:</strong> el pueblo debe encontrar y linchar a todos los lobos. Los lobos deben eliminar al pueblo hasta igualar o superar su numero.</p>
       <p><strong>Fases:</strong> Noche (los roles con habilidad actuan en privado) → Dia (debate libre) → Votacion (se elige a quien linchar, no puedes votarte a ti mismo).</p>
-      <p><strong>Chat de lobos:</strong> solo los jugadores con rol de lobo ven ese chat y el voto nocturno de la manada.</p>
-      <p><strong>Roles especiales:</strong> toca tu carta de rol (arriba a la derecha) para ver la descripcion completa de tu habilidad en cualquier momento.</p>
+      <p><strong>Chat de lobos:</strong> visible en el mismo chat con estilo distinto, solo los jugadores con rol de lobo lo ven y pueden usarlo.</p>
+      <p><strong>Amantes (Cupido):</strong> al inicio de la partida, 2 jugadores al azar (de cualquier rol o bando) son marcados como Amantes. Tienen su propio chat privado. Si uno muere, el otro muere de pena. Si son los ultimos 2 supervivientes, ganan juntos sin importar su bando original.</p>
       <p><strong>Necromancer:</strong> solo puede revivir jugadores buenos que ya hayan muerto. Si nadie ha muerto aun, no tendra objetivos disponibles esa noche.</p>
       <p><strong>Mystic:</strong> cada noche puede investigar el rol exacto de cualquier jugador (util contra jugadores inactivos).</p>
       <p><strong>Licantropo:</strong> si los lobos lo atacan de noche, en vez de morir se convierte en lobo y pasa a jugar con la manada.</p>

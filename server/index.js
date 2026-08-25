@@ -18,6 +18,7 @@ const START_COUNTDOWN_MS = 20 * 1000;
 const NIGHT_DURATION_MS = 45 * 1000;
 const DAY_DURATION_MS = 90 * 1000;
 const VOTING_DURATION_MS = 30 * 1000;
+const ANNOUNCEMENT_DELAY_MS = 4 * 1000;
 const MAX_PLAYERS = 20;
 
 function generateRoomCode() {
@@ -43,14 +44,20 @@ function sendSystemMessage(room, text) {
   io.to(room.code).emit("chat_message", msg);
 }
 
-function showPopup(room, text, type) {
-  io.to(room.code).emit("show_popup", { text, type: type || "info" });
+function sendWolfChatMessage(room, author, text) {
+  const msg = { author, text, ts: Date.now(), wolfOnly: true };
+  room.wolvesAlive().forEach((w) => {
+    if (w.socketId) io.to(w.socketId).emit("chat_message", msg);
+  });
 }
 
-function sendWolfChatMessage(room, author, text) {
-  const msg = { author, text, ts: Date.now() };
-  room.wolvesAlive().forEach((w) => {
-    if (w.socketId) io.to(w.socketId).emit("wolf_chat_message", msg);
+function sendLoverChatMessage(room, authorId, author, text) {
+  const partnerId = room.getLoverPartner(authorId);
+  if (!partnerId) return;
+  const msg = { author, text, ts: Date.now(), loverOnly: true };
+  [authorId, partnerId].forEach((pid) => {
+    const p = room.players[pid];
+    if (p && p.socketId) io.to(p.socketId).emit("chat_message", msg);
   });
 }
 
@@ -145,8 +152,7 @@ function runBotDayActions(room) {
     room.usedOnceAbilities.add(bot.id);
 
     if (result.type === "witch_reveal") {
-      sendSystemMessage(room, `La Witch revela que ${result.targetName} es ${result.roleName}.`);
-      showPopup(room, `🧙 La Witch revela: ${result.targetName} es ${result.roleName}`, "info");
+      sendSystemMessage(room, `🧙 La Witch revela que ${result.targetName} es ${result.roleName}.`);
     }
     if (result.type === "wolf_shaman_protect") {
       sendSystemMessage(room, "El Wolf Shaman ha protegido a alguien del linchamiento de hoy.");
@@ -195,8 +201,7 @@ function broadcastVoteTally(room) {
 function startInitialCountdown(room) {
   room.phase = "starting";
   io.to(room.code).emit("phase_change", { phase: "starting", dayNumber: 0, durationMs: START_COUNTDOWN_MS });
-  sendSystemMessage(room, "La partida comienza en unos segundos. Revisa tu rol.");
-  showPopup(room, "⏳ La partida comienza en 20 segundos...", "info");
+  sendSystemMessage(room, "⏳ La partida comienza en 20 segundos. Revisa tu rol.");
 
   clearTimeout(room.phaseTimer);
   room.phaseTimer = setTimeout(() => {
@@ -211,8 +216,7 @@ function startNightPhase(room) {
   room.resetNightState();
 
   io.to(room.code).emit("phase_change", { phase: "night", dayNumber: room.dayNumber, durationMs: NIGHT_DURATION_MS });
-  sendSystemMessage(room, `Cae la noche ${room.dayNumber}. Los roles con accion nocturna deben actuar.`);
-  showPopup(room, `🌙 Cae la noche ${room.dayNumber}`, "night");
+  sendSystemMessage(room, `🌙 Cae la noche ${room.dayNumber}. Los roles con accion nocturna deben actuar.`);
 
   const cursedBySiren = room.nightState.sirenCurseActive;
   const cursedByKing = room.nightState.kingCurseActive;
@@ -276,8 +280,7 @@ function resolveNight(room) {
   if (ns.revivedPlayerId) {
     const revived = room.revivePlayer(ns.revivedPlayerId);
     if (revived) {
-      sendSystemMessage(room, `Una fuerza misteriosa trae de vuelta a ${revived.name}.`);
-      showPopup(room, `✨ ${revived.name} ha vuelto a la vida`, "revive");
+      sendSystemMessage(room, `✨ Una fuerza misteriosa trae de vuelta a ${revived.name}.`);
     }
   }
 
@@ -312,13 +315,11 @@ function resolveNight(room) {
       // Protegido por el Doctor: no muere
     } else if (victim.role.passiveShieldOnce && !room.usedShields.has(victimId)) {
       room.usedShields.add(victimId);
-      sendSystemMessage(room, `${victim.name} sobrevive al ataque gracias a su armadura.`);
-      showPopup(room, `🛡️ ${victim.name} sobrevivio al ataque`, "info");
+      sendSystemMessage(room, `🛡️ ${victim.name} sobrevive al ataque gracias a su armadura.`);
     } else if (victim.role.id === "lycan" && Object.values(ns.wolfVotes).includes(victimId)) {
       victim.role = require("./roles").ROLES.werewolf;
       if (victim.socketId) io.to(victim.socketId).emit("role_changed", { roleName: "Werewolf", team: "evil" });
-      sendSystemMessage(room, `Los lobos atacaron a ${victim.name} en la noche, pero se ha transformado en Werewolf y ahora es parte de la manada.`);
-      showPopup(room, `🐺 ${victim.name} se transformo en Werewolf`, "info");
+      sendSystemMessage(room, `🐺 Los lobos atacaron a ${victim.name} en la noche, pero se ha transformado en Werewolf y ahora es parte de la manada.`);
     } else {
       applyDeath(room, victimId, deaths);
     }
@@ -349,7 +350,21 @@ function resolveNight(room) {
     }
   });
 
-  startDayPhase(room, deaths);
+  if (deaths.length === 0) {
+    sendSystemMessage(room, "☀️ Amanece. Nadie murio esta noche. El pueblo puede debatir.");
+  } else {
+    deaths.forEach((p) => {
+      sendSystemMessage(room, `💀 Amanece. ${p.name} fue atacado por los lobos durante la noche. Su rol era: ${p.role.name}.`);
+    });
+  }
+
+  const winner = room.checkWinCondition();
+
+  clearTimeout(room.phaseTimer);
+  room.phaseTimer = setTimeout(() => {
+    if (winner) return endGame(room, winner);
+    startDayPhaseAfterAnnouncement(room);
+  }, ANNOUNCEMENT_DELAY_MS);
 }
 
 function applyDeath(room, playerId, deathsArray) {
@@ -359,24 +374,11 @@ function applyDeath(room, playerId, deathsArray) {
   deathsArray.push(player);
 }
 
-function startDayPhase(room, deaths) {
+function startDayPhaseAfterAnnouncement(room) {
   room.phase = "day";
   io.to(room.code).emit("phase_change", { phase: "day", dayNumber: room.dayNumber, durationMs: DAY_DURATION_MS });
 
-  if (deaths.length === 0) {
-    sendSystemMessage(room, "Amanece. Nadie murio esta noche. El pueblo puede debatir.");
-    showPopup(room, "☀️ Amanece. Nadie murio esta noche", "day");
-  } else {
-    deaths.forEach((p) => {
-      sendSystemMessage(room, `Amanece. ${p.name} fue atacado por los lobos durante la noche. Su rol era: ${p.role.name}.`);
-      showPopup(room, `💀 ${p.name} murio de noche (${p.role.name})`, "death");
-    });
-  }
-
   broadcastPlayerList(room);
-
-  const winner = room.checkWinCondition();
-  if (winner) return endGame(room, winner);
 
   sendDayActionRequests(room);
   runBotDayActions(room);
@@ -391,8 +393,7 @@ function startVotingPhase(room) {
   room.dayState = room.dayState || {};
 
   io.to(room.code).emit("phase_change", { phase: "voting", dayNumber: room.dayNumber, durationMs: VOTING_DURATION_MS });
-  sendSystemMessage(room, "Comienza la votacion. Elige a quien crees que es un lobo.");
-  showPopup(room, "🗳️ Comienza la votacion", "voting");
+  sendSystemMessage(room, "🗳️ Comienza la votacion. Elige a quien crees que es un lobo.");
   broadcastVoteTally(room);
 
   runBotVotes(room);
@@ -421,8 +422,7 @@ function resolveVoting(room) {
   }
 
   if (lynchedId && room.dayState.lynchImmuneId === lynchedId) {
-    sendSystemMessage(room, "Una fuerza oscura protege al acusado. El linchamiento no tiene efecto.");
-    showPopup(room, "🌀 El linchamiento fue bloqueado", "info");
+    sendSystemMessage(room, "🌀 Una fuerza oscura protege al acusado. El linchamiento no tiene efecto.");
     lynchedId = null;
   }
 
@@ -431,12 +431,10 @@ function resolveVoting(room) {
 
     if (target.role.id === "princess" && !room.usedOnceAbilities.has(target.id)) {
       room.usedOnceAbilities.add(target.id);
-      sendSystemMessage(room, `${target.name} revela ser la Princess y sobrevive al linchamiento.`);
-      showPopup(room, `👑 ${target.name} revela ser la Princess y sobrevive`, "info");
+      sendSystemMessage(room, `👑 ${target.name} revela ser la Princess y sobrevive al linchamiento.`);
     } else {
       room.killPlayer(lynchedId);
-      sendSystemMessage(room, `${target.name} fue linchado por el pueblo. Su rol era: ${target.role.name}.`);
-      showPopup(room, `⚖️ ${target.name} fue linchado de dia (${target.role.name})`, "death");
+      sendSystemMessage(room, `⚖️ ${target.name} fue linchado por el pueblo. Su rol era: ${target.role.name}.`);
 
       if (target.role.id === "siren") {
         room.nightState.sirenCurseActive = true;
@@ -448,35 +446,41 @@ function resolveVoting(room) {
       const partnerId = room.getLoverPartner(lynchedId);
       if (partnerId && room.players[partnerId] && room.players[partnerId].alive) {
         room.killPlayer(partnerId);
-        sendSystemMessage(room, `${room.players[partnerId] ? room.players[partnerId].name : "Su pareja"} muere de pena junto a su amante.`);
+        sendSystemMessage(room, `💔 ${room.players[partnerId] ? room.players[partnerId].name : "Su pareja"} muere de pena junto a su amante.`);
       }
     }
   } else {
-    sendSystemMessage(room, "El pueblo no logra ponerse de acuerdo. Nadie es linchado.");
-    showPopup(room, "🤷 Nadie fue linchado", "info");
+    sendSystemMessage(room, "🤷 El pueblo no logra ponerse de acuerdo. Nadie es linchado.");
   }
 
   broadcastPlayerList(room);
 
   const winner = room.checkWinCondition();
-  if (winner) return endGame(room, winner);
 
-  room.dayState = {};
-  startNightPhase(room);
+  clearTimeout(room.phaseTimer);
+  room.phaseTimer = setTimeout(() => {
+    if (winner) return endGame(room, winner);
+    room.dayState = {};
+    startNightPhase(room);
+  }, ANNOUNCEMENT_DELAY_MS);
 }
 
 function endGame(room, winner) {
   room.phase = "ended";
   clearTimeout(room.phaseTimer);
 
-  const winnerLabels = { good: "El pueblo gana la partida.", evil: "Los lobos ganan la partida.", jester: "El Jester gana la partida." };
+  const winnerLabels = {
+    good: "El pueblo gana la partida.",
+    evil: "Los lobos ganan la partida.",
+    jester: "El Jester gana la partida.",
+    lovers: "Los Amantes ganan la partida: son los ultimos dos en pie.",
+  };
 
   io.to(room.code).emit("game_over", {
     winner,
-    roles: room.playerList().map((p) => ({ name: p.name, role: p.role.name, roleId: p.role.id, team: p.role.team })),
+    roles: room.playerList().map((p) => ({ name: p.name, role: p.role.name, roleId: p.role.id, team: p.role.team, isLover: room.isLover(p.id) })),
   });
-  sendSystemMessage(room, winnerLabels[winner] || "La partida ha terminado.");
-  showPopup(room, `🏁 ${winnerLabels[winner] || "Partida terminada"}`, "gameover");
+  sendSystemMessage(room, `🏁 ${winnerLabels[winner] || "La partida ha terminado."}`);
 }
 
 io.on("connection", (socket) => {
@@ -536,16 +540,23 @@ io.on("connection", (socket) => {
 
     room.assignRoles();
     room.playerList().filter((p) => !p.isBot).forEach((p) => {
+      const partnerId = room.getLoverPartner(p.id);
       io.to(p.socketId).emit("role_assigned", {
         role: p.role.id,
         roleName: p.role.name,
         team: p.role.team,
         description: p.role.description,
         hasDayActionOnce: !!p.role.hasDayActionOnce,
+        isLover: !!partnerId,
+        loverPartnerName: partnerId && room.players[partnerId] ? room.players[partnerId].name : null,
       });
     });
 
-    sendSystemMessage(room, "La partida ha comenzado. Revisa tu rol en privado.");
+    if (room.lovePairs.length > 0) {
+      sendSystemMessage(room, "💕 Dos corazones han sido unidos por Cupido esta noche. Ninguno sabe quien mas lo sabe...");
+    }
+
+    sendSystemMessage(room, "🎮 La partida ha comenzado. Revisa tu rol en privado.");
 
     startInitialCountdown(room);
   });
@@ -606,8 +617,7 @@ io.on("connection", (socket) => {
     room.usedOnceAbilities.add(player.id);
 
     if (result.type === "witch_reveal") {
-      sendSystemMessage(room, `La Witch revela que ${result.targetName} es ${result.roleName}.`);
-      showPopup(room, `🧙 La Witch revela: ${result.targetName} es ${result.roleName}`, "info");
+      sendSystemMessage(room, `🧙 La Witch revela que ${result.targetName} es ${result.roleName}.`);
     }
     if (result.type === "wolf_shaman_protect") {
       sendSystemMessage(room, "El Wolf Shaman ha protegido a alguien del linchamiento de hoy.");
@@ -637,10 +647,19 @@ io.on("connection", (socket) => {
 
   socket.on("wolf_chat_message", ({ code, text }) => {
     const room = rooms[code];
-    if (!room || room.phase !== "night") return;
+    if (!room) return;
     const player = room.players[socket.id];
     if (!player || !player.alive || player.role.team !== "evil") return;
     sendWolfChatMessage(room, player.name, text);
+  });
+
+  socket.on("lover_chat_message", ({ code, text }) => {
+    const room = rooms[code];
+    if (!room) return;
+    const player = room.players[socket.id];
+    if (!player || !player.alive) return;
+    if (!room.isLover(socket.id)) return;
+    sendLoverChatMessage(room, socket.id, player.name, text);
   });
 
   socket.on("disconnect", () => {

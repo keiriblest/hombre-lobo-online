@@ -13,28 +13,13 @@ let state = {
   voteTally: {},
   wolfVoteTally: {},
   currentCenterView: "announcement",
+  isLover: false,
 };
 
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
 }
-
-let popupTimeout = null;
-
-socket.on("show_popup", ({ text, type }) => {
-  const overlay = document.getElementById("popup-overlay");
-  const box = document.getElementById("popup-box");
-  document.getElementById("popup-text").textContent = text;
-
-  box.className = "popup-box popup-" + (type || "info");
-  overlay.classList.remove("hidden");
-
-  clearTimeout(popupTimeout);
-  popupTimeout = setTimeout(() => {
-    overlay.classList.add("hidden");
-  }, 3000);
-});
 
 function loadProfile() {
   try {
@@ -241,14 +226,29 @@ function renderPlayersRing(players) {
 
 socket.on("role_assigned", (role) => {
   state.myRole = role;
+  state.isLover = !!role.isLover;
   updateRoleChip(role);
   fillRoleCard(role);
+  updateChatChannelOptions();
 
-  document.getElementById("wolf-chat-bar").classList.toggle("hidden", role.team !== "evil");
   document.getElementById("btn-close-role-detail").classList.add("hidden");
 
   showScreen("screen-role");
 });
+
+function updateChatChannelOptions() {
+  const select = document.getElementById("chat-channel-select");
+  const wolfOption = select.querySelector('option[value="wolf"]');
+  const loverOption = select.querySelector('option[value="lover"]');
+
+  const isWolf = state.myRole && state.myRole.team === "evil";
+  wolfOption.classList.toggle("hidden", !isWolf);
+  wolfOption.disabled = !isWolf;
+  loverOption.classList.toggle("hidden", !state.isLover);
+  loverOption.disabled = !state.isLover;
+
+  select.classList.toggle("hidden", !isWolf && !state.isLover);
+}
 
 function updateRoleChip(role) {
   const imgEl = document.getElementById("my-role-chip-img");
@@ -261,6 +261,14 @@ function fillRoleCard(role) {
   document.getElementById("role-card-name").textContent = role.roleName;
   document.getElementById("role-card-team").textContent = role.team === "evil" ? "Bando: Malo" : "Bando: Bueno";
   document.getElementById("role-description").textContent = role.description;
+
+  const loverNote = document.getElementById("role-lover-note");
+  if (role.isLover && role.loverPartnerName) {
+    loverNote.textContent = `💕 Estas enamorado/a de ${role.loverPartnerName}. Si uno de los dos muere, el otro morira de pena. Si son los ultimos 2 supervivientes, ganan juntos.`;
+    loverNote.classList.remove("hidden");
+  } else {
+    loverNote.classList.add("hidden");
+  }
 
   const imgEl = document.getElementById("role-card-img");
   const fallbackEl = document.getElementById("role-card-fallback");
@@ -286,7 +294,7 @@ document.getElementById("btn-close-role-detail").addEventListener("click", () =>
 socket.on("role_changed", (role) => {
   state.myRole = role;
   updateRoleChip(role);
-  document.getElementById("wolf-chat-bar").classList.toggle("hidden", role.team !== "evil");
+  updateChatChannelOptions();
   setAnnouncement(`Tu rol ha cambiado. Ahora eres: ${role.roleName}.`, "🐺");
 });
 
@@ -318,11 +326,9 @@ function setAnnouncement(text, icon) {
   document.getElementById("announcement-text").textContent = text;
   document.getElementById("announcement-icon").textContent = icon || "📢";
 
-  if (state.currentCenterView === "announcement" || state.currentCenterView === null) {
-    hideAllCenterPanels();
-    document.getElementById("center-announcement").classList.remove("hidden");
-    state.currentCenterView = "announcement";
-  }
+  hideAllCenterPanels();
+  document.getElementById("center-announcement").classList.remove("hidden");
+  state.currentCenterView = "announcement";
 }
 
 let phaseInterval = null;
@@ -335,9 +341,6 @@ socket.on("phase_change", ({ phase, dayNumber, durationMs }) => {
   document.getElementById("phase-label").textContent = labels[phase] || phase;
 
   hideAllCenterPanels();
-
-  const wolfBar = document.getElementById("wolf-chat-bar");
-  if (wolfBar) wolfBar.classList.toggle("hidden", !(state.myRole && state.myRole.team === "evil"));
 
   if (phase === "night") {
     document.getElementById("night-targets").innerHTML = "";
@@ -550,20 +553,33 @@ function sendChat() {
   const input = document.getElementById("chat-input");
   const text = input.value.trim();
   if (!text) return;
-  socket.emit("chat_message", { code: state.code, text });
+
+  const channel = document.getElementById("chat-channel-select").value;
+
+  if (channel === "wolf") {
+    socket.emit("wolf_chat_message", { code: state.code, text });
+  } else if (channel === "lover") {
+    socket.emit("lover_chat_message", { code: state.code, text });
+  } else {
+    socket.emit("chat_message", { code: state.code, text });
+  }
+
   input.value = "";
 }
 
 socket.on("chat_message", (msg) => {
-  addSystemChatLine(msg.author, msg.text, msg.author === "Sistema");
+  const kind = msg.wolfOnly ? "wolf" : (msg.loverOnly ? "lover" : (msg.author === "Sistema" ? "system" : "public"));
+  addChatLine(msg.author, msg.text, kind);
 
-  if (msg.author === "Sistema") {
+  if (kind === "system") {
     setAnnouncement(msg.text, pickAnnouncementIcon(msg.text));
     return;
   }
 
   const bubble = document.getElementById("chat-bubble");
-  document.getElementById("chat-bubble-author").textContent = msg.author + ":";
+  bubble.className = "chat-bubble " + (kind === "wolf" ? "wolf-bubble" : kind === "lover" ? "lover-bubble" : "");
+  const prefix = kind === "wolf" ? "🐺 " : kind === "lover" ? "💕 " : "";
+  document.getElementById("chat-bubble-author").textContent = prefix + msg.author + ":";
   document.getElementById("chat-bubble-text").textContent = msg.text;
   bubble.classList.remove("hidden");
 });
@@ -575,6 +591,7 @@ function pickAnnouncementIcon(text) {
   if (text.includes("Amanece")) return "☀️";
   if (text.includes("votacion") || text.includes("vota")) return "🗳️";
   if (text.includes("gana")) return "🏁";
+  if (text.includes("Amantes") || text.includes("Cupido")) return "💕";
   return "📢";
 }
 
@@ -586,60 +603,24 @@ document.getElementById("btn-close-chat-history").addEventListener("click", () =
   document.getElementById("chat-history-drawer").classList.add("hidden");
 });
 
-function addSystemChatLine(author, text, isSystem) {
+function addChatLine(author, text, kind) {
   const log = document.getElementById("chat-log");
   const div = document.createElement("div");
-  div.className = "msg" + (isSystem ? " system" : "");
-  div.innerHTML = isSystem ? text : `<span class="author">${author}:</span> ${text}`;
+  div.className = "msg" + (kind === "system" ? " system" : kind === "wolf" ? " wolf-msg" : kind === "lover" ? " lover-msg" : "");
+  const prefix = kind === "wolf" ? "🐺 " : kind === "lover" ? "💕 " : "";
+  div.innerHTML = kind === "system" ? text : `<span class="author">${prefix}${author}:</span> ${text}`;
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
 }
 
-const wolfChatBtn = document.getElementById("btn-send-wolf-chat");
-if (wolfChatBtn) {
-  wolfChatBtn.addEventListener("click", sendWolfChat);
-  document.getElementById("wolf-chat-input").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") sendWolfChat();
-  });
-}
-
-function sendWolfChat() {
-  const input = document.getElementById("wolf-chat-input");
-  const text = input.value.trim();
-  if (!text) return;
-  socket.emit("wolf_chat_message", { code: state.code, text });
-  input.value = "";
-}
-
-socket.on("wolf_chat_message", (msg) => {
-  const log = document.getElementById("wolf-chat-log");
-  if (log) {
-    const div = document.createElement("div");
-    div.className = "msg";
-    div.innerHTML = `<span class="author">${msg.author}:</span> ${msg.text}`;
-    log.appendChild(div);
-    log.scrollTop = log.scrollHeight;
-  }
-
-  const bubble = document.getElementById("wolf-chat-bubble");
-  if (bubble) {
-    document.getElementById("wolf-chat-bubble-author").textContent = msg.author + ":";
-    document.getElementById("wolf-chat-bubble-text").textContent = msg.text;
-    bubble.classList.remove("hidden");
-  }
-});
-
-document.getElementById("wolf-chat-bubble").addEventListener("click", () => {
-  document.getElementById("wolf-chat-history-drawer").classList.remove("hidden");
-});
-
-document.getElementById("btn-close-wolf-chat-history").addEventListener("click", () => {
-  document.getElementById("wolf-chat-history-drawer").classList.add("hidden");
-});
-
 socket.on("game_over", ({ winner, roles }) => {
   clearInterval(phaseInterval);
-  const titles = { good: "🎉 El pueblo ha ganado", evil: "🐺 Los lobos han ganado", jester: "🏏 El Jester ha ganado" };
+  const titles = {
+    good: "🎉 El pueblo ha ganado",
+    evil: "🐺 Los lobos han ganado",
+    jester: "🏏 El Jester ha ganado",
+    lovers: "💕 Los Amantes han ganado",
+  };
   document.getElementById("end-title").textContent = titles[winner] || "Partida terminada";
 
   const container = document.getElementById("end-roles-cards");
@@ -648,7 +629,7 @@ socket.on("game_over", ({ winner, roles }) => {
   roles.forEach((r) => {
     const roleId = r.roleId || null;
     const card = document.createElement("div");
-    card.className = "mini-role-card" + (r.team === "evil" ? " card-evil" : " card-good");
+    card.className = "mini-role-card" + (r.team === "evil" ? " card-evil" : " card-good") + (r.isLover ? " card-lover" : "");
 
     const img = document.createElement("img");
     img.className = "mini-role-card-img";
@@ -667,7 +648,7 @@ socket.on("game_over", ({ winner, roles }) => {
 
     const label = document.createElement("div");
     label.className = "mini-role-card-label";
-    label.innerHTML = `<strong>${r.name}</strong><br>${r.role}`;
+    label.innerHTML = `<strong>${r.name}</strong>${r.isLover ? " 💕" : ""}<br>${r.role}`;
 
     card.appendChild(img);
     card.appendChild(fallback);

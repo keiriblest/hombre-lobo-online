@@ -213,51 +213,6 @@ button.secondary { background: #0f3460; }
 
 .hidden { display: none !important; }
 
-.popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-.popup-overlay.hidden {
-  opacity: 0;
-  visibility: hidden;
-}
-
-.popup-box {
-  background: #22223b;
-  border-radius: 16px;
-  padding: 28px 40px;
-  font-size: 22px;
-  font-weight: bold;
-  text-align: center;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
-  border: 3px solid #e94560;
-  max-width: 90%;
-  animation: popup-in 0.25s ease;
-}
-
-@keyframes popup-in {
-  from { transform: scale(0.85); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
-.popup-night { border-color: #4361ee; background: #1b1b3a; }
-.popup-day { border-color: #f4a261; background: #2b2410; }
-.popup-voting { border-color: #e94560; }
-.popup-death { border-color: #d62828; background: #2b0f0f; }
-.popup-revive { border-color: #4caf50; background: #10241a; }
-.popup-gameover { border-color: #ffd60a; background: #2b2410; font-size: 26px; }
-.popup-info { border-color: #0f3460; }
-
 .card-wide {
   max-width: 420px;
 }
@@ -626,10 +581,6 @@ button.secondary { background: #0f3460; }
   margin-bottom: 12px;
 }
 
-.table-layout {
-  padding-bottom: 0;
-}
-
 .chat-bar {
   background: #16213e;
   border-radius: 12px;
@@ -677,15 +628,6 @@ button.secondary { background: #0f3460; }
 .chat-bar-input-row input { flex: 1; margin: 0; }
 .chat-bar-input-row button { width: auto; padding: 10px 16px; margin: 0; }
 
-.wolf-chat-bar {
-  border: 2px solid #7a1f2b;
-}
-
-.wolf-bubble {
-  background: #4a0e2b;
-}
-.wolf-bubble:hover { background: #6a1a3d; }
-
 .chat-log-full {
   height: auto;
   max-height: 60vh;
@@ -701,4 +643,44 @@ button.secondary { background: #0f3460; }
   text-align: center;
   font-size: 15px;
   line-height: 1.5;
+}
+
+.chat-channel-select {
+  width: auto;
+  padding: 10px 8px;
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #1a1a2e;
+  color: #eaeaea;
+  font-size: 13px;
+}
+.chat-channel-select.hidden { display: none; }
+
+.chat-bubble.wolf-bubble {
+  background: #4a0e2b;
+}
+.chat-bubble.wolf-bubble:hover { background: #6a1a3d; }
+
+.chat-bubble.lover-bubble {
+  background: #6a1a3d;
+  border: 1px solid #ff6b9d;
+}
+.chat-bubble.lover-bubble:hover { background: #8a2856; }
+
+.chat-log .msg.wolf-msg .author { color: #ff6b6b; }
+.chat-log .msg.wolf-msg { background: rgba(122, 31, 43, 0.25); border-radius: 6px; padding: 4px 6px; }
+
+.chat-log .msg.lover-msg .author { color: #ff6b9d; }
+.chat-log .msg.lover-msg { background: rgba(122, 31, 90, 0.25); border-radius: 6px; padding: 4px 6px; }
+
+.lover-note {
+  color: #ff6b9d;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+.mini-role-card.card-lover {
+  border-color: #ff6b9d;
+  box-shadow: 0 0 10px rgba(255, 107, 157, 0.5);
 }

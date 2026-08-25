@@ -1,5 +1,6 @@
 // server/roles/index.js
-// Registro central de los 27 roles del juego.
+// Registro central de los 26 roles jugables (Lover ya no es un rol propio: ahora es
+// un vinculo aplicado sobre 2 jugadores con roles normales, tipo "Cupido").
 const villager = require("./villager");
 const seer = require("./seer");
 const doctor = require("./doctor");
@@ -21,7 +22,6 @@ const lycan = require("./lycan");
 const mayor = require("./mayor");
 const assassin = require("./assassin");
 const town_crier = require("./town_crier");
-const lover = require("./lover");
 const druid = require("./druid");
 const mystic = require("./mystic");
 const thief = require("./thief");
@@ -32,7 +32,7 @@ const ROLES = {
   villager, seer, doctor, werewolf,
   alpha_wolf, vampire, witch, siren, shapeshifter, nightmare, wolf_shaman,
   knight, princess, hunter, necromancer, king, jester, lycan, mayor,
-  assassin, town_crier, lover, druid, mystic, thief, courtesan, bard,
+  assassin, town_crier, druid, mystic, thief, courtesan, bard,
 };
 
 const EVIL_ROLE_IDS = [
@@ -43,7 +43,7 @@ const EVIL_ROLE_IDS = [
 const GOOD_ROLE_IDS = [
   "seer", "doctor", "knight", "princess", "hunter", "necromancer",
   "king", "jester", "lycan", "mayor", "assassin", "town_crier",
-  "lover", "lover", "druid", "mystic", "thief", "courtesan", "bard",
+  "druid", "mystic", "thief", "courtesan", "bard",
 ];
 
 module.exports = { ROLES, EVIL_ROLE_IDS, GOOD_ROLE_IDS };

@@ -1,9 +1,7 @@
 // server/roles/lover.js
-module.exports = {
-  id: "lover",
-  name: "Lover",
-  team: "good",
-  description: "Esta enamorado de otro jugador. Si uno de los dos muere, el otro tambien muere de tristeza (salvo escudo activo).",
-  hasNightAction: false,
-  paired: true,
-};
+// NOTA: este archivo ya no se usa como rol independiente.
+// El vinculo de Amantes ahora se aplica como un flag "isLover" sobre 2 jugadores
+// con roles normales (ver Room.assignRoles() en gameState.js), igual que el Cupido
+// del juego original: cualquier jugador de cualquier bando puede ser marcado como
+// Amante, y ambos ganan juntos si son los ultimos 2 supervivientes.
+module.exports = null;

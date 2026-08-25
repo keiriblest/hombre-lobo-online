@@ -9,17 +9,8 @@ function buildRolePool(nPlayers, evilRatio = 0.3) {
   const chosenEvil = evilPool.slice(0, Math.min(nEvil, evilPool.length));
   while (chosenEvil.length < nEvil) chosenEvil.push("werewolf");
 
-  let chosenGood = [];
-  const goodPoolNoLovers = GOOD_ROLE_IDS.filter((id) => id !== "lover");
-  const shuffledGood = shuffle([...goodPoolNoLovers]);
-
-  if (nGood >= 2 && Math.random() < 0.6) {
-    chosenGood.push("lover", "lover");
-    chosenGood = chosenGood.concat(shuffledGood.slice(0, Math.max(0, nGood - 2)));
-  } else {
-    chosenGood = shuffledGood.slice(0, nGood);
-  }
-
+  const goodPool = shuffle([...GOOD_ROLE_IDS]);
+  let chosenGood = goodPool.slice(0, Math.min(nGood, goodPool.length));
   while (chosenGood.length < nGood) chosenGood.push("villager");
   chosenGood = chosenGood.slice(0, nGood);
 
@@ -54,6 +45,7 @@ class Room {
     this.chatLog = [];
     this.phaseTimer = null;
     this.lovePairs = [];
+    this.loversEnabled = true;
     this.usedOnceAbilities = new Set();
     this.usedShields = new Set();
     this.jesterEliminated = false;
@@ -112,9 +104,11 @@ class Room {
       this.players[id].role = ROLES[roleId];
     });
 
-    const loverIds = ids.filter((id) => this.players[id].role.id === "lover");
-    if (loverIds.length === 2) {
-      this.lovePairs.push(loverIds);
+    if (this.loversEnabled && ids.length >= 4 && Math.random() < 0.5) {
+      const shuffledIds = shuffle([...ids]);
+      const pairA = shuffledIds[0];
+      const pairB = shuffledIds[1];
+      this.lovePairs.push([pairA, pairB]);
     }
   }
 
@@ -157,7 +151,22 @@ class Room {
     return king.role.isImmuneAtNight ? king.role.isImmuneAtNight(this) : false;
   }
 
+  isLover(playerId) {
+    return this.lovePairs.some((pair) => pair.includes(playerId));
+  }
+
   checkWinCondition() {
+    if (this.lovePairs.length > 0) {
+      const alive = this.alivePlayers();
+      if (alive.length === 2) {
+        const pair = this.lovePairs[0];
+        const aliveIds = alive.map((p) => p.id);
+        if (pair.every((id) => aliveIds.includes(id))) {
+          return "lovers";
+        }
+      }
+    }
+
     if (this.jesterEliminated) return "jester";
 
     const wolves = this.wolvesAlive().length;
