@@ -56,6 +56,20 @@
       <p id="night-wait-msg" class="hint">Espera a que actuen los demas roles...</p>
     </div>
 
+    <div id="wolf-chat-panel" class="panel hidden">
+      <h3>🐺 Chat privado de lobos</h3>
+      <div id="wolf-chat-log" class="chat-log"></div>
+      <div class="chat-input-row">
+        <input id="wolf-chat-input" type="text" placeholder="Solo los lobos ven esto..." maxlength="200" />
+        <button id="btn-send-wolf-chat">Enviar</button>
+      </div>
+    </div>
+
+    <div id="day-action-panel" class="panel hidden">
+      <h3>Habilidad especial (una vez por partida)</h3>
+      <div id="day-action-targets" class="target-list"></div>
+    </div>
+
     <div id="voting-panel" class="panel hidden">
       <h3>Votacion: ¿quien es sospechoso?</h3>
       <div id="voting-targets" class="target-list"></div>

@@ -1,9 +1,9 @@
-// server/roles/werewolf.js
+// server/roles/alpha_wolf.js
 module.exports = {
-  id: "werewolf",
-  name: "Werewolf",
+  id: "alpha_wolf",
+  name: "Alpha Wolf",
   team: "evil",
-  description: "Cada noche, junto a los demas lobos, vota para elegir una victima. Debe pasar desapercibido de dia.",
+  description: "Lidera a la manada. Vota junto a los demas lobos para elegir victima, pero la Seer lo ve como bueno.",
   hasNightAction: true,
   nightOrder: 40,
 

@@ -4,11 +4,9 @@ const socket = io();
 let state = {
   code: null,
   playerName: null,
-  myId: null,
   isHost: false,
   myRole: null,
-  selectedTarget: null,
-  selectedVote: null,
+  currentPlayers: [],
 };
 
 function showScreen(id) {
@@ -86,7 +84,13 @@ socket.on("role_assigned", (role) => {
   state.myRole = role;
   document.getElementById("role-name").textContent = `${role.roleName} (${role.team === "evil" ? "Malo" : "Bueno"})`;
   document.getElementById("role-description").textContent = role.description;
+  document.getElementById("wolf-chat-panel").classList.toggle("hidden", role.team !== "evil");
   showScreen("screen-role");
+});
+
+socket.on("role_changed", (role) => {
+  state.myRole = role;
+  addSystemChatLine(`Tu rol ha cambiado. Ahora eres: ${role.roleName}.`);
 });
 
 document.getElementById("btn-continue-role").addEventListener("click", () => {
@@ -104,12 +108,17 @@ socket.on("phase_change", ({ phase, dayNumber, durationMs }) => {
 
   document.getElementById("night-panel").classList.toggle("hidden", phase !== "night");
   document.getElementById("voting-panel").classList.toggle("hidden", phase !== "voting");
+  document.getElementById("day-action-panel").classList.toggle("hidden", phase !== "day" || !state.myRole || !state.myRole.hasDayActionOnce);
+
+  const wolfPanel = document.getElementById("wolf-chat-panel");
+  if (wolfPanel) wolfPanel.classList.toggle("hidden", !(state.myRole && state.myRole.team === "evil" && phase === "night"));
 
   if (phase !== "night") {
     document.getElementById("night-targets").innerHTML = "";
     document.getElementById("night-wait-msg").classList.add("hidden");
   }
   if (phase === "voting") renderVotingTargets();
+  if (phase === "day") renderDayActionTargets();
 
   startPhaseTimer(durationMs);
 });
@@ -126,8 +135,10 @@ function startPhaseTimer(durationMs) {
   }, 1000);
 }
 
-socket.on("night_action_request", ({ role, roleName, targets }) => {
-  document.getElementById("night-action-title").textContent = `${roleName}: elige tu objetivo`;
+socket.on("night_action_request", ({ role, roleName, targets, isOnce }) => {
+  document.getElementById("night-action-title").textContent = isOnce
+    ? `${roleName}: elige tu objetivo (habilidad unica, solo puedes usarla una vez)`
+    : `${roleName}: elige tu objetivo`;
   const container = document.getElementById("night-targets");
   container.innerHTML = "";
   document.getElementById("night-wait-msg").classList.remove("hidden");
@@ -149,6 +160,12 @@ socket.on("night_action_result", (result) => {
   if (result.type === "seer_result") {
     addSystemChatLine(`(privado) Investigaste a ${result.targetName}: es del bando ${result.alignment}.`);
   }
+  if (result.type === "mystic_reveal") {
+    addSystemChatLine(`(privado) El Mystic descubre que ese jugador es: ${result.roleName}.`);
+  }
+  if (result.type === "bard_exchange") {
+    addSystemChatLine(`(privado) Intercambio de informacion: ${result.targetName} es ${result.targetRoleName}.`);
+  }
 });
 
 function renderVotingTargets() {
@@ -164,6 +181,25 @@ function renderVotingTargets() {
         container.querySelectorAll(".target-btn").forEach((b) => b.classList.remove("selected"));
         btn.classList.add("selected");
         socket.emit("day_vote", { code: state.code, targetId: p.id });
+      });
+      container.appendChild(btn);
+    });
+}
+
+function renderDayActionTargets() {
+  if (!state.myRole || !state.myRole.hasDayActionOnce) return;
+  const container = document.getElementById("day-action-targets");
+  container.innerHTML = "";
+  (state.currentPlayers || [])
+    .filter((p) => p.alive && p.id !== socket.id)
+    .forEach((p) => {
+      const btn = document.createElement("div");
+      btn.className = "target-btn";
+      btn.textContent = p.name;
+      btn.addEventListener("click", () => {
+        container.querySelectorAll(".target-btn").forEach((b) => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        socket.emit("day_action", { code: state.code, targetId: p.id });
       });
       container.appendChild(btn);
     });
@@ -199,6 +235,32 @@ function addSystemChatLine(text) {
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
 }
+
+const wolfChatBtn = document.getElementById("btn-send-wolf-chat");
+if (wolfChatBtn) {
+  wolfChatBtn.addEventListener("click", sendWolfChat);
+  document.getElementById("wolf-chat-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendWolfChat();
+  });
+}
+
+function sendWolfChat() {
+  const input = document.getElementById("wolf-chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  socket.emit("wolf_chat_message", { code: state.code, text });
+  input.value = "";
+}
+
+socket.on("wolf_chat_message", (msg) => {
+  const log = document.getElementById("wolf-chat-log");
+  if (!log) return;
+  const div = document.createElement("div");
+  div.className = "msg";
+  div.innerHTML = `<span class="author">${msg.author}:</span> ${msg.text}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+});
 
 socket.on("game_over", ({ winner, roles }) => {
   clearInterval(phaseInterval);

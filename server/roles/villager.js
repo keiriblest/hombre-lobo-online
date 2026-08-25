@@ -1,8 +1,8 @@
 // server/roles/villager.js
 module.exports = {
   id: "villager",
-  name: "Aldeano",
+  name: "Villager",
   team: "good",
-  description: "No tiene habilidades especiales. Debe usar la lógica y el debate para encontrar a los lobos.",
+  description: "No tiene habilidades especiales. Debe usar la logica y el debate para encontrar a los lobos.",
   hasNightAction: false,
 };
